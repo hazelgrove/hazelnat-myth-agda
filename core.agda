@@ -4,23 +4,6 @@ open import List
 open import contexts
 
 module core where
-
-  {- TODO
-  -- for-all is true iff the predicate holds true for all i less than n
-  data for-all : (n : Nat) → ((i : Nat) → i < n → Set) → Set where
-    FA : ∀{n p} → (∀{i} → (i<n : i < n) → p i i<n) → for-all n p
-    -- FA0   : ∀{p} → for-all' Z p
-    -- FAInd : {!!}
-    -- FAInd : ∀{n p} → for-all' n p → p n n<1+n → for-all' (1+ n) (λ i h → p i ?)
-    -- for-all (1+ n) p = p n n<1+n ∧ for-all n λ i h → p i (<trans h n<1+n)
-
-  -- for-all : (n : Nat) → ((i : Nat) → i < n → Set) → Set
-  -- for-all = {!!}
-
-  -- for-all-correct2 : ∀{n p} → (∀{i} → i < n → Σ[ h ∈ i < n ] p i h) → for-all n p
-  -- for-all-correct2 = {!!}
-  -}
-
   -- for-all n p is true iff p holds true for all i less than n
   for-all : (n : Nat) → ((i : Nat) → i < n → Set) → Set
   for-all n p = ∀{i} → (i<n : i < n) → p i i<n
@@ -59,15 +42,48 @@ module core where
     env = final ctx
 
     data final : Set where
-      FVal : val → final
-      FUnf : unf → final
+      [_]λ_=>_         : env → Nat → exp → final
+      [_]fix_⦇·λ_=>_·⦈ : env → Nat → Nat → exp → final
+      ⟨_⟩              : List final → final
+      C[_]_            : Nat → final → final
+      [_]??[_]         : env → Nat → final
+      _⌊≠λ/fix:_⌋∘_    : (fin : final) → (∀{E f x e} → fin ≠ ([ E ]λ x => e) ∧ fin ≠ [ E ]fix f ⦇·λ x => e ·⦈) → final → final
+      get[_th-of_]_    : Nat → Nat → final → final
+      -- TODO case_of⦃·_·⦄    : (f : final) → (f unfinished)
 
-    -- value results
-    data val : Set where
-      [_]λ_=>_         : env → Nat → exp → val
-      [_]fix_⦇·λ_=>_·⦈ : env → Nat → Nat → exp → val
-      ⟨_⟩              : List val → val
-      C[_]_            : Nat → val → val
+    {- TODO
+    data final : Set where
+      [_]λ_=>_         : env → Nat → exp → final
+      [_]fix_⦇·λ_=>_·⦈ : env → Nat → Nat → exp → final
+      ⟨_⟩              : List final → final
+      C[_]_            : Nat → final → final
+      [_]??[_]         : env → Nat → final
+      _⦇given_⦈∘_      : (f : final) → (f unfinished) → final → final
+      get[_th-of_]_    : Nat → Nat → final → final
+      case_of⦃·_·⦄    : (f : final) → (f unfinished)
+
+    -- unfinished expressions can't be evaluated further but aren't values
+    data _unfinished : final → Set where
+      UFTuple : ∀{fs i i<∥fs∥} → fs ⟦ i given i<∥fs∥ ⟧ unfinished → ⟨ fs ⟩ unfinished
+      UFCtor  : ∀{unf c} → unf unfinished → (C[ c ] unf) unfinished
+      UFHole  : ∀{E u} → [ E ]??[ u ] unfinished
+      -- TODO
+      -- UFAp
+      -- UFGet
+      -- UFCase
+    -}
+
+    -- values are final expressions that don't have holes
+    data _value : final → Set where
+      VLam : ∀{E x e} → ([ E ]λ x => e) value
+      VFix : ∀{E f x e} → [ E ]fix f ⦇·λ x => e ·⦈ value
+      -- TODO avoid map
+      VTpl : (vs : List (Σ[ r ∈ final ] (r value))) → ⟨ map π1 vs ⟩ value
+      VCon : ∀{c r} → r value → (C[ c ] r) value
+
+    -- TODO MetaThm - forall final, value xor unfinished
+
+    {- TODO
 
     -- unfinished results
     data unf : Set where
@@ -77,7 +93,9 @@ module core where
       _∘_           : unf → final → unf
       get[_th-of_]_ : Nat → Nat → unf → unf
       case_of⦃·_·⦄ : unf → List rule → unf
+    -}
 
+  {- TODO
   -- Big step evaluation
   data _⊢_⇒_ : env → exp → final → Set where
     EFun    : ∀{E x e} → E ⊢ ·λ x => e ⇒ FVal ([ E ]λ x => e)
@@ -88,26 +106,10 @@ module core where
               (e,v-list : List (Σ[ e ∈ exp ] Σ[ v ∈ val ] (E ⊢ e ⇒ FVal v))) →
               E ⊢ ⟨ map π1 e,v-list ⟩ ⇒ FVal ⟨ map (λ e,v → π1 (π2 e,v)) e,v-list ⟩
     -- TODO ETupleU
-    ECtorV  : ∀{E i e v} → E ⊢ e ⇒ FVal v → E ⊢ C[ i ] e ⇒ FVal ( C[ i ] v)
-    ECtorU  : ∀{E i e u} → E ⊢ e ⇒ FUnf u → E ⊢ C[ i ] e ⇒ FUnf ( C[ i ] u)
+    ECtorV  : ∀{E c e v} → E ⊢ e ⇒ FVal v → E ⊢ C[ c ] e ⇒ FVal ( C[ c ] v)
+    ECtorU  : ∀{E c e u} → E ⊢ e ⇒ FUnf u → E ⊢ C[ c ] e ⇒ FUnf ( C[ c ] u)
     -- EAp  :
-
-    {- TODO}
-    data result : Set where
-      [_]λ_⇒_         : env → Nat → exp → result
-      [_]fix_⦇·λ_⇒_·⦈ : env → Nat → Nat → exp → result
-      ⟨_⟩              : List result → result
-      C[_]_            : Nat → result → result
-      [_]??[_]         : env → Nat → result
-      _⌊_⌋∘_           : (f : result) → (f value → ⊥) → result → result
-      -- TODO remaining cases
-
-    data _value : result → Set where
-      VLam : ∀{E x e} → ([ E ]λ x ⇒ e) value
-      VFix : ∀{E f x e} → [ E ]fix f ⦇·λ x ⇒ e ·⦈ value
-      VTpl : (vs : List (Σ[ r ∈ result ] (r value))) → ⟨ map π1 vs ⟩ value
-      VCon : ∀{i r} → r value → (C[ i ] r) value
-      -}
+  -}
 
 {- TODO
 

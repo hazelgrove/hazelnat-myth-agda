@@ -1,8 +1,8 @@
-# hazel-palette-agda
-This repository is the mechanization of our ongoing work on palettes. The
-starting point is the dynamics developed in our in our [POPL19
-paper](https://arxiv.org/pdf/1805.00155), mechanized
-[here](https://github.com/hazelgrove/hazelnut-dynamics-agda).
+# hazelnat-myth-agda
+This repository is the mechanization of our ongoing work on type+example synthesis
+with big-step hazelnut dynamics. This borrows heavily from the
+[mechanization](https://github.com/hazelgrove/hazelnut-dynamics-agda) of
+[POPL19 paper](https://arxiv.org/pdf/1805.00155).
 
 # How To Check These Proofs
 

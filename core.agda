@@ -9,7 +9,7 @@ module core where
   for-all n p = ∀{i} → (i<n : i < n) → p i i<n
 
   syntax for-all n (λ i → P) = ∀[ i < n ] P
-  -- syntax for-all n (λ i h → P) = ∀[ i < n ⦇proof: h ⦈] P
+  -- TODO syntax for-all n (λ i h → P) = ∀[ i < n ⦇proof: h ⦈] P
 
   -- types
   data typ : Set where
@@ -36,64 +36,43 @@ module core where
       case_of⦃·_·⦄  : exp → List rule → exp
       ??[_]          : Nat → exp
 
-  -- final expressions
   mutual
     env : Set
-    env = final ctx
+    env = result ctx
 
-    data final : Set where
-      [_]λ_=>_         : env → Nat → exp → final
-      [_]fix_⦇·λ_=>_·⦈ : env → Nat → Nat → exp → final
-      ⟨_⟩              : List final → final
-      C[_]_            : Nat → final → final
-      [_]??[_]         : env → Nat → final
-      _⌊≠λ/fix:_⌋∘_    : (fin : final) → (∀{E f x e} → fin ≠ ([ E ]λ x => e) ∧ fin ≠ [ E ]fix f ⦇·λ x => e ·⦈) → final → final
-      get[_th-of_]_    : Nat → Nat → final → final
-      -- TODO case_of⦃·_·⦄    : (f : final) → (f unfinished)
+    -- results - evaluation takes expressions to results, but results aren't necessarily final
+    data result : Set where
+      [_]λ_=>_         : env → Nat → exp → result
+      [_]fix_⦇·λ_=>_·⦈ : env → Nat → Nat → exp → result
+      ⟨_⟩              : List result → result
+      C[_]_            : Nat → result → result
+      [_]??[_]         : env → Nat → result
+      _∘_              : result → result → result
+      get[_th-of_]_    : Nat → Nat → result → result
+      [_]case_of⦃·_·⦄ : env → result → List rule → result
 
-    {- TODO
-    data final : Set where
-      [_]λ_=>_         : env → Nat → exp → final
-      [_]fix_⦇·λ_=>_·⦈ : env → Nat → Nat → exp → final
-      ⟨_⟩              : List final → final
-      C[_]_            : Nat → final → final
-      [_]??[_]         : env → Nat → final
-      _⦇given_⦈∘_      : (f : final) → (f unfinished) → final → final
-      get[_th-of_]_    : Nat → Nat → final → final
-      case_of⦃·_·⦄    : (f : final) → (f unfinished)
+  -- values are final and do not have holes
+  data _value : result → Set where
+    VLam : ∀{E x e} → ([ E ]λ x => e) value
+    VFix : ∀{E f x e} → [ E ]fix f ⦇·λ x => e ·⦈ value
+    -- TODO avoid map
+    VTpl : (vs : List (Σ[ r ∈ result ] (r value))) → ⟨ map π1 vs ⟩ value
+    VCon : ∀{c r} → r value → (C[ c ] r) value
 
-    -- unfinished expressions can't be evaluated further but aren't values
-    data _unfinished : final → Set where
-      UFTuple : ∀{fs i i<∥fs∥} → fs ⟦ i given i<∥fs∥ ⟧ unfinished → ⟨ fs ⟩ unfinished
-      UFCtor  : ∀{unf c} → unf unfinished → (C[ c ] unf) unfinished
-      UFHole  : ∀{E u} → [ E ]??[ u ] unfinished
-      -- TODO
-      -- UFAp
-      -- UFGet
-      -- UFCase
-    -}
+  -- final results are those that cannot be evaluated further
+  data _final : result → Set where
+    FVal  : ∀{r} → r value → r final
+    -- TODO avoid map
+    FTpl  : (rs : List (Σ[ r ∈ result ] (r final))) → ⟨ map π1 rs ⟩ final
+    FCon  : ∀{c r} → r final → (C[ c ] r) final
+    FHole : ∀{E u} → [ E ]??[ u ] final
+    FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
+    -- TODO what if r = ⟨ rs ⟩ but it has the wrong length?
+    FGet  : ∀{i n r} → r final → (∀{rs} → r ≠ ⟨ rs ⟩) → (get[ i th-of n ] r) final
+    -- TODO what if r = C[ c ] r' but c is of the wrong sort?
+    FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → [ E ]case r of⦃· rules ·⦄ final
 
-    -- values are final expressions that don't have holes
-    data _value : final → Set where
-      VLam : ∀{E x e} → ([ E ]λ x => e) value
-      VFix : ∀{E f x e} → [ E ]fix f ⦇·λ x => e ·⦈ value
-      -- TODO avoid map
-      VTpl : (vs : List (Σ[ r ∈ final ] (r value))) → ⟨ map π1 vs ⟩ value
-      VCon : ∀{c r} → r value → (C[ c ] r) value
-
-    -- TODO MetaThm - forall final, value xor unfinished
-
-    {- TODO
-
-    -- unfinished results
-    data unf : Set where
-      ⟨_++⟨_⟩++_⟩   : List final → unf → List final → unf
-      C[_]_         : Nat → unf → unf
-      [_]??[_]      : env → Nat → unf
-      _∘_           : unf → final → unf
-      get[_th-of_]_ : Nat → Nat → unf → unf
-      case_of⦃·_·⦄ : unf → List rule → unf
-    -}
+  -- TODO metatheorem - any final that's not a value contains a hole somewhere
 
   {- TODO
   -- Big step evaluation

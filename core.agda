@@ -4,13 +4,6 @@ open import List
 open import contexts
 
 module core where
-  -- for-all n p is true iff p holds true for all i less than n
-  for-all : (n : Nat) → ((i : Nat) → i < n → Set) → Set
-  for-all n p = ∀{i} → (i<n : i < n) → p i i<n
-
-  syntax for-all n (λ i → P) = ∀[ i < n ] P
-  -- TODO syntax for-all n (λ i h → P) = ∀[ i < n ⦇proof: h ⦈] P
-
   -- types
   data typ : Set where
     _==>_ : typ → typ → typ
@@ -55,15 +48,13 @@ module core where
   data _value : result → Set where
     VLam : ∀{E x e} → ([ E ]λ x => e) value
     VFix : ∀{E f x e} → [ E ]fix f ⦇·λ x => e ·⦈ value
-    -- TODO avoid map
-    VTpl : (vs : List (Σ[ r ∈ result ] (r value))) → ⟨ map π1 vs ⟩ value
+    VTpl : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) value) → ⟨ rs ⟩ value
     VCon : ∀{c r} → r value → (C[ c ] r) value
 
   -- final results are those that cannot be evaluated further
   data _final : result → Set where
     FVal  : ∀{r} → r value → r final
-    -- TODO avoid map
-    FTpl  : (rs : List (Σ[ r ∈ result ] (r final))) → ⟨ map π1 rs ⟩ final
+    FTpl  : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) final) → ⟨ rs ⟩ final
     FCon  : ∀{c r} → r final → (C[ c ] r) final
     FHole : ∀{E u} → [ E ]??[ u ] final
     FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final

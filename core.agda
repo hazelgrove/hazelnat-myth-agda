@@ -64,27 +64,57 @@ module core where
     FHole : ∀{E u} → [ E ]??[ u ] final
     FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
     -- TODO what if r = ⟨ rs ⟩ but it has the wrong length?
+    -- TODO what about i >= n? should we check that in the syntax too?
     FGet  : ∀{i n r} → r final → (∀{rs} → r ≠ ⟨ rs ⟩) → (get[ i th-of n ] r) final
     -- TODO what if r = C[ c ] r' but c is of the wrong sort?
     FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → [ E ]case r of⦃· rules ·⦄ final
 
-  -- TODO metatheorem - any final that's not a value contains a hole somewhere
-
-  {- TODO
   -- Big step evaluation
-  data _⊢_⇒_ : env → exp → final → Set where
-    EFun    : ∀{E x e} → E ⊢ ·λ x => e ⇒ FVal ([ E ]λ x => e)
-    EFix    : ∀{E fun x e} → E ⊢ fix fun ⦇·λ x => e ·⦈ ⇒ FVal ([ E ]fix fun ⦇·λ x => e ·⦈)
-    EVar    : ∀{E x f} → (x , f) ∈ E → E ⊢ X[ x ] ⇒ f
-    -- TODO we probably need to clear out map
-    ETupleV : ∀{E} →
-              (e,v-list : List (Σ[ e ∈ exp ] Σ[ v ∈ val ] (E ⊢ e ⇒ FVal v))) →
-              E ⊢ ⟨ map π1 e,v-list ⟩ ⇒ FVal ⟨ map (λ e,v → π1 (π2 e,v)) e,v-list ⟩
-    -- TODO ETupleU
-    ECtorV  : ∀{E c e v} → E ⊢ e ⇒ FVal v → E ⊢ C[ c ] e ⇒ FVal ( C[ c ] v)
-    ECtorU  : ∀{E c e u} → E ⊢ e ⇒ FUnf u → E ⊢ C[ c ] e ⇒ FUnf ( C[ c ] u)
-    -- EAp  :
-  -}
+  data _⊢_⇒_ : env → exp → result → Set where
+    EFun             : ∀{E x e} → E ⊢ ·λ x => e ⇒ ([ E ]λ x => e)
+    EFix             : ∀{E f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⇒ [ E ]fix f ⦇·λ x => e ·⦈
+    EVar             : ∀{E x r} → (x , r) ∈ E → E ⊢ X[ x ] ⇒ r
+    EHole            : ∀{E u} → E ⊢ ??[ u ] ⇒ [ E ]??[ u ]
+    ETuple           : ∀{E es} {rs : List result} →
+                         (leqh : ∥ es ∥ == ∥ rs ∥) →
+                         -- TODO this should probably factored out somehow
+                         (∀{i} → (h : i < ∥ es ∥) → E ⊢ es ⟦ i given h ⟧ ⇒ (rs ⟦ i given tr (λ n → i < n) leqh h ⟧)) →
+                         E ⊢ ⟨ es ⟩ ⇒ ⟨ rs ⟩
+    ECtor            : ∀{E c e r} → E ⊢ e ⇒ r → E ⊢ C[ c ] e ⇒ (C[ c ] r)
+    EApp             : ∀{E e1 e2 Ef x ef r2 r} →
+                         E ⊢ e1 ⇒ ([ Ef ]λ x => ef) →
+                         E ⊢ e2 ⇒ r2 →
+                         (Ef ,, (x , r2)) ⊢ ef ⇒ r →
+                         E ⊢ e1 ∘ e2 ⇒ r
+    EAppFix          : ∀{E e1 e2 Ef f x ef r1 r2 r} →
+                         r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                         E ⊢ e1 ⇒ r1 →
+                         E ⊢ e2 ⇒ r2 →
+                         (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⇒ r →
+                         E ⊢ e1 ∘ e2 ⇒ r
+    EAppUnfinished   : ∀{E e1 e2 r1 r2} →
+                         E ⊢ e1 ⇒ r1 →
+                         (∀{Ef x ef} → r1 ≠ ([ Ef ]λ x => ef)) →
+                         (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
+                         E ⊢ e2 ⇒ r2 →
+                         E ⊢ e1 ∘ e2 ⇒ (r1 ∘ r2)
+    EGet             : ∀{E i e rs} → (h : i < ∥ rs ∥) → E ⊢ e ⇒ ⟨ rs ⟩ → E ⊢ get[ i th-of ∥ rs ∥ ] e ⇒ (rs ⟦ i given h ⟧)
+    -- TODO what if e evals to a tuple, but it has the wrong length?
+    EGetUnfinished   : ∀{E i n e r} → E ⊢ e ⇒ r → (∀{rs} → r ≠ ⟨ rs ⟩) → E ⊢ get[ i th-of n ] e ⇒ (get[ i th-of n ] r)
+    -- TODO what if the same ctor appears in two case rules?
+    EMatch           : ∀{E e rules j Cj xj ej r' r} →
+                         (h : j < ∥ rules ∥) →
+                         |C[ Cj ] xj => ej == rules ⟦ j given h ⟧ →
+                         E ⊢ e ⇒ (C[ Cj ] r') →
+                         (E ,, (xj , r')) ⊢ ej ⇒ r →
+                         E ⊢ case e of⦃· rules ·⦄ ⇒ r
+    -- TODO what if e evals to a ctor, but that ctor doesn't appear in a case branch?
+    EMatchUnfinished : ∀{E e rules r} →
+                         E ⊢ e ⇒ r →
+                         (∀{j e'} → r ≠ (C[ j ] e')) →
+                         E ⊢ case e of⦃· rules ·⦄ ⇒ [ E ]case r of⦃· rules ·⦄
+
+    -- TODO metathm that evaluation always results in a final
 
 {- TODO
 

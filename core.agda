@@ -15,8 +15,13 @@ module core where
 
   -- Expressions (Sketches)
   mutual
-    data rule : Set where
-      |C[_]_=>_ : Nat → exp → exp → rule
+    record rule : Set where
+      inductive
+      constructor |C[_]_=>_
+      field
+        ctor   : Nat
+        parm   : Nat
+        branch : exp
 
     data exp : Set where
       ·λ_=>_         : Nat → exp → exp

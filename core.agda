@@ -34,6 +34,37 @@ module core where
       case_of⦃·_·⦄  : exp → List rule → exp
       ??[_]          : Nat → exp
 
+  data hole-name-new : (e : exp) → (u : Nat) → Set where
+    HNNLam  : ∀{x e u} → hole-name-new e u → hole-name-new (·λ x => e) u
+    HNNFix  : ∀{x f e u} → hole-name-new e u → hole-name-new (fix f ⦇·λ x => e ·⦈) u
+    HNNVar  : ∀{x u} → hole-name-new (X[ x ]) u
+    HNNAp   : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (e1 ∘ e2) u
+    HNNTup  : ∀{es u} → (∀{i} → (h : i < ∥ es ∥) → hole-name-new (es ⟦ i given h ⟧) u) → hole-name-new ⟨ es ⟩ u
+    HNNGet  : ∀{i n e u} → hole-name-new e u → hole-name-new (get[ i th-of n ] e) u
+    HNNCtor : ∀{c e u} → hole-name-new e u → hole-name-new (C[ c ] e) u
+    HNNCase : ∀{e rules u} →
+                hole-name-new e u →
+                (∀{i} → (h : i < ∥ rules ∥) → hole-name-new (rule.branch (rules ⟦ i given h ⟧)) u) →
+                hole-name-new (case e of⦃· rules ·⦄) u
+    HNNHole : ∀{u' u} → u' ≠ u → hole-name-new (??[ u' ]) u
+
+  -- two terms that do not share any hole names
+  data holes-disjoint : (e1 : exp) → (e2 : exp) → Set where
+    HDLam  : ∀{x e e'} → holes-disjoint e e' → holes-disjoint (·λ x => e) e'
+    HDFix  : ∀{x f e e'} → holes-disjoint e e' → holes-disjoint (fix f ⦇·λ x => e ·⦈) e'
+    HDVar  : ∀{x e'} → holes-disjoint (X[ x ]) e'
+    HDAp   : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (e1 ∘ e2) e'
+    HDTup  : ∀{es e'} → (∀{i} → (h : i < ∥ es ∥) → holes-disjoint (es ⟦ i given h ⟧) e') → holes-disjoint ⟨ es ⟩ e'
+    HDGet  : ∀{i n e e'} → holes-disjoint e e' → holes-disjoint (get[ i th-of n ] e) e'
+    HDCtor : ∀{c e e'} → holes-disjoint e e' → holes-disjoint (C[ c ] e) e'
+    HDCase : ∀{e rules e'} →
+               holes-disjoint e e' →
+               (∀{i} → (h : i < ∥ rules ∥) → holes-disjoint (rule.branch (rules ⟦ i given h ⟧)) e') →
+               holes-disjoint (case e of⦃· rules ·⦄) e'
+    HDHole : ∀{u e'} → hole-name-new e' u → holes-disjoint (??[ u ]) e'
+
+  tctx = typ ctx
+
   mutual
     env : Set
     env = result ctx

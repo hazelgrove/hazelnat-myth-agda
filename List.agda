@@ -47,16 +47,21 @@ module List where
   ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = []} h = refl
   ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = a1 :: l1rest} {l2} {a} h = ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = l1rest} {l2} {a} (1+n<1+m→n<m h)
 
+  foldl : {ℓ1 ℓ2 : Level} → {A : Set ℓ1} → {B : Set ℓ2} → (B → A → B) → B → List A → B
+  foldl f b [] = b
+  foldl f b (a :: as) = foldl f (f b a) as
+
+  foldl-++ : {ℓ1 ℓ2 : Level} {A : Set ℓ1} {B : Set ℓ2} {l1 l2 : List A} {f : B → A → B} {b0 : B} →
+              foldl f b0 (l1 ++ l2) == foldl f (foldl f b0 l1) l2
+  foldl-++ {l1 = []} = refl
+  foldl-++ {l1 = a1 :: l1rest} = foldl-++ {l1 = l1rest}
+
   {- TODO either delete these, or add metatheorems for them
   zip : {A B : Set} → (a : List A) → (b : List B) → ∥ a ∥ == ∥ b ∥ → List (A × B)
   zip [] [] eqH = []
   zip [] (b :: bs) ()
   zip (a :: as) [] ()
   zip (a :: as) (b :: bs) eqH = (a , b) :: zip as bs (1+EQ eqH)
-
-  fold : {l : Level} → {A : Set} → {B : Set l} → (B → A → B) → B → List A → B
-  fold f b [] = b
-  fold f b (a :: as) = fold f (f b a) as
   -}
 
   -- TODO what things below do we actually need?

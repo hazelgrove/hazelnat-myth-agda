@@ -101,51 +101,61 @@ module core where
     FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → [ E ]case r of⦃· rules ·⦄ final
 
   -- Big step evaluation
-  data _⊢_⇒_ : env → exp → result → Set where
-    EFun             : ∀{E x e} → E ⊢ ·λ x => e ⇒ ([ E ]λ x => e)
-    EFix             : ∀{E f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⇒ [ E ]fix f ⦇·λ x => e ·⦈
-    EVar             : ∀{E x r} → (x , r) ∈ E → E ⊢ X[ x ] ⇒ r
-    EHole            : ∀{E u} → E ⊢ ??[ u ] ⇒ [ E ]??[ u ]
-    ETuple           : ∀{E es} {rs : List result} →
-                         (leqh : ∥ es ∥ == ∥ rs ∥) →
+  -- TODO : Change List ⊤ to K or List K or whatever
+  data _⊢_⇒_⊣_ : env → exp → result → List ⊤ → Set where
+    EFun             : ∀{E x e} → E ⊢ ·λ x => e ⇒ [ E ]λ x => e ⊣ []
+    EFix             : ∀{E f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
+    EVar             : ∀{E x r} → (x , r) ∈ E → E ⊢ X[ x ] ⇒ r ⊣ []
+    EHole            : ∀{E u} → E ⊢ ??[ u ] ⇒ [ E ]??[ u ] ⊣ []
+    ETuple           : ∀{E es rs ks} →
+                         (leqh1 : ∥ es ∥ == ∥ rs ∥) →
+                         (leqh2 : ∥ es ∥ == ∥ ks ∥) →
                          -- TODO this should probably factored out somehow
-                         (∀{i} → (h : i < ∥ es ∥) → E ⊢ es ⟦ i given h ⟧ ⇒ (rs ⟦ i given tr (λ n → i < n) leqh h ⟧)) →
-                         E ⊢ ⟨ es ⟩ ⇒ ⟨ rs ⟩
-    ECtor            : ∀{E c e r} → E ⊢ e ⇒ r → E ⊢ C[ c ] e ⇒ (C[ c ] r)
-    EApp             : ∀{E e1 e2 Ef x ef r2 r} →
-                         E ⊢ e1 ⇒ ([ Ef ]λ x => ef) →
-                         E ⊢ e2 ⇒ r2 →
-                         (Ef ,, (x , r2)) ⊢ ef ⇒ r →
-                         E ⊢ e1 ∘ e2 ⇒ r
-    EAppFix          : ∀{E e1 e2 Ef f x ef r1 r2 r} →
+                         (∀{i} →
+                            (h : i < ∥ es ∥) →
+                            (hr : i < ∥ rs ∥) →
+                            (hk : i < ∥ ks ∥) →
+                            E ⊢ es ⟦ i given h ⟧ ⇒ rs ⟦ i given hr ⟧ ⊣ (ks ⟦ i given hk ⟧)) →
+                         E ⊢ ⟨ es ⟩ ⇒ ⟨ rs ⟩ ⊣ foldl _++_ [] ks
+    ECtor            : ∀{E c e r k} → E ⊢ e ⇒ r ⊣ k → E ⊢ C[ c ] e ⇒ (C[ c ] r) ⊣ k
+    EApp             : ∀{E e1 e2 Ef x ef kf r2 k2 r k} →
+                         E ⊢ e1 ⇒ ([ Ef ]λ x => ef) ⊣ kf →
+                         E ⊢ e2 ⇒ r2 ⊣ k2 →
+                         (Ef ,, (x , r2)) ⊢ ef ⇒ r ⊣ k →
+                         E ⊢ e1 ∘ e2 ⇒ r ⊣ kf ++ k2 ++ k
+    EAppFix          : ∀{E e1 e2 Ef f x ef r1 k1 r2 k2 r k} →
                          r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                         E ⊢ e1 ⇒ r1 →
-                         E ⊢ e2 ⇒ r2 →
-                         (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⇒ r →
-                         E ⊢ e1 ∘ e2 ⇒ r
-    EAppUnfinished   : ∀{E e1 e2 r1 r2} →
-                         E ⊢ e1 ⇒ r1 →
+                         E ⊢ e1 ⇒ r1 ⊣ k1 →
+                         E ⊢ e2 ⇒ r2 ⊣ k2 →
+                         (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⇒ r ⊣ k →
+                         E ⊢ e1 ∘ e2 ⇒ r ⊣ k1 ++ k2 ++ k
+    EAppUnfinished   : ∀{E e1 e2 r1 k1 r2 k2} →
+                         E ⊢ e1 ⇒ r1 ⊣ k1 →
                          (∀{Ef x ef} → r1 ≠ ([ Ef ]λ x => ef)) →
                          (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
-                         E ⊢ e2 ⇒ r2 →
-                         E ⊢ e1 ∘ e2 ⇒ (r1 ∘ r2)
-    EGet             : ∀{E i e rs} → (h : i < ∥ rs ∥) → E ⊢ e ⇒ ⟨ rs ⟩ → E ⊢ get[ i th-of ∥ rs ∥ ] e ⇒ (rs ⟦ i given h ⟧)
+                         E ⊢ e2 ⇒ r2 ⊣ k2 →
+                         E ⊢ e1 ∘ e2 ⇒ (r1 ∘ r2) ⊣ k1 ++ k2
+    EGet             : ∀{E i e rs k} →
+                         (h : i < ∥ rs ∥) →
+                         E ⊢ e ⇒ ⟨ rs ⟩ ⊣ k →
+                         E ⊢ get[ i th-of ∥ rs ∥ ] e ⇒ (rs ⟦ i given h ⟧) ⊣ k
     -- TODO what if e evals to a tuple, but it has the wrong length?
-    EGetUnfinished   : ∀{E i n e r} → E ⊢ e ⇒ r → (∀{rs} → r ≠ ⟨ rs ⟩) → E ⊢ get[ i th-of n ] e ⇒ (get[ i th-of n ] r)
+    EGetUnfinished   : ∀{E i n e r k} → E ⊢ e ⇒ r ⊣ k → (∀{rs} → r ≠ ⟨ rs ⟩) → E ⊢ get[ i th-of n ] e ⇒ (get[ i th-of n ] r) ⊣ k
     -- TODO what if the same ctor appears in two case rules?
-    EMatch           : ∀{E e rules j Cj xj ej r' r} →
+    EMatch           : ∀{E e rules j Cj xj ej r' k' r k} →
                          (h : j < ∥ rules ∥) →
                          |C[ Cj ] xj => ej == rules ⟦ j given h ⟧ →
-                         E ⊢ e ⇒ (C[ Cj ] r') →
-                         (E ,, (xj , r')) ⊢ ej ⇒ r →
-                         E ⊢ case e of⦃· rules ·⦄ ⇒ r
+                         E ⊢ e ⇒ (C[ Cj ] r') ⊣ k' →
+                         (E ,, (xj , r')) ⊢ ej ⇒ r ⊣ k →
+                         E ⊢ case e of⦃· rules ·⦄ ⇒ r ⊣ k' ++ k
     -- TODO what if e evals to a ctor, but that ctor doesn't appear in a case branch?
-    EMatchUnfinished : ∀{E e rules r} →
-                         E ⊢ e ⇒ r →
+    EMatchUnfinished : ∀{E e rules r k} →
+                         E ⊢ e ⇒ r ⊣ k →
                          (∀{j e'} → r ≠ (C[ j ] e')) →
-                         E ⊢ case e of⦃· rules ·⦄ ⇒ [ E ]case r of⦃· rules ·⦄
+                         E ⊢ case e of⦃· rules ·⦄ ⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
 
     -- TODO metathm that evaluation always results in a final
+    -- TODO metathm that holes-disjoint implies constraints-disjoint, and one that constraints produced by evaluation have index uniqueness
 
 {- TODO
 

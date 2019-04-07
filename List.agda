@@ -41,7 +41,18 @@ module List where
   (a :: as) ⟦ Z given h ⟧ = a
   (a :: as) ⟦ 1+ i given h ⟧ = as ⟦ i given 1+n<1+m→n<m h ⟧
 
-  -- TODO metatheorems for indexing
+  {- TODO delete
+  -- lemma that's useful for the next metatheorem
+  ∥l1∥<∥l1++[a]++l2∥ : {l : Level} {A : Set l} {l1 l2 : List A} {a : A} → ∥ l1 ∥ < ∥ l1 ++ (a :: []) ++ l2 ∥
+  ∥l1∥<∥l1++[a]++l2∥ {l1 = l1} {l2} {a} with l1 ++ (a :: l2) | ++assc {a1 = l1} {a :: []} {l2} | ∥-++-comm {a1 = l1} {a :: l2}
+  ∥l1∥<∥l1++[a]++l2∥ {l1 = l1} {l2} {a} | _ | refl | h = tr (λ m → ∥ l1 ∥ ≤ m) h n≤n+m , tr (λ m → ∥ l1 ∥ ≠ m) h n≠n+1+m
+  -}
+
+  ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a : {l : Level} {A : Set l} {l1 l2 : List A} {a : A} →
+                             (h : ∥ l1 ∥ < ∥ l1 ++ (a :: []) ++ l2 ∥) →
+                             ((l1 ++ (a :: []) ++ l2) ⟦ ∥ l1 ∥ given h ⟧ == a)
+  ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = []} h = refl
+  ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = a1 :: l1rest} {l2} {a} h = ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = l1rest} {l2} {a} (1+n<1+m→n<m h)
 
   {- TODO either delete these, or add metatheorems for them
   zip : {A B : Set} → (a : List A) → (b : List B) → ∥ a ∥ == ∥ b ∥ → List (A × B)

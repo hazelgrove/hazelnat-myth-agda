@@ -17,6 +17,9 @@ module Nat where
   1+ap-cp : ∀{n m} → 1+ n ≠ 1+ m → n ≠ m
   1+ap-cp h1 h2 = h1 (1+ap h2)
 
+  1+inj-cp : ∀{n m} → n ≠ m → 1+ n ≠ 1+ m
+  1+inj-cp h1 h2 = h1 (1+inj h2)
+
   -- equality of naturals is decidable. we represent this as computing a
   -- choice of units, with inl <> meaning that the naturals are indeed the
   -- same and inr <> that they are not.
@@ -113,5 +116,8 @@ module Nat where
   π1 (<trans (π3 , π4) (π5 , π6)) = ≤trans π3 π5
   π2 (<trans (π3 , π4) (≤refl , π6)) = abort (π6 refl)
   π2 (<trans (π3 , π4) (≤1+ π5 , π6)) refl = 1+n≰n (≤trans π3 π5)
+
+  n<m→1+n<1+m : ∀{n m} → n < m → 1+ n < 1+ m
+  n<m→1+n<1+m (π3 , π4) = n≤m→1+n≤1+m π3 , 1+inj-cp π4
 
   infix 40 _<_

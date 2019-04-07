@@ -59,7 +59,7 @@ module List where
   fold f b (a :: as) = fold f (f b a) as
   -}
 
-  -- TODO what things do we actually need?
+  -- TODO what things below do we actually need?
 
   data _in-List_ {A : Set} : A → List A → Set where
     InH : {a : A} {as : List A} → a in-List (a :: as)

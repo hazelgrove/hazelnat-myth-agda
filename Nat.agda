@@ -93,9 +93,9 @@ module Nat where
   ≤trans (≤1+ a≤b) ≤refl = ≤1+ a≤b
   ≤trans (≤1+ a≤b) (≤1+ b≤c) = ≤1+ (≤trans (≤1+ a≤b) b≤c)
 
-  <antisym : ∀{n m} → n ≤ m → m ≤ n → n == m
-  <antisym {n} {.n} ≤refl m≤n = refl
-  <antisym {n} {.(1+ _)} (≤1+ h1) h2 = abort (1+n≰n (≤trans h2 h1))
+  ≤antisym : ∀{n m} → n ≤ m → m ≤ n → n == m
+  ≤antisym {n} {.n} ≤refl m≤n = refl
+  ≤antisym {n} {.(1+ _)} (≤1+ h1) h2 = abort (1+n≰n (≤trans h2 h1))
 
   _<_ : Nat → Nat → Set
   n < m = n ≤ m ∧ n ≠ m

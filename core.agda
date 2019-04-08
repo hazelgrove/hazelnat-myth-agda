@@ -64,6 +64,69 @@ module core where
     HDHole : ∀{u e'} → hole-name-new e' u → holes-disjoint (??[ u ]) e'
 
   tctx = typ ctx
+  hctx = (tctx ∧ typ) ctx
+  denv = Σ[ dctx ∈ tctx ctx ]
+          ∀{d1 d2 cctx1 cctx2 c} →
+            d1 ≠ d2 →
+            (d1 , cctx1) ∈ dctx →
+            (d2 , cctx2) ∈ dctx →
+            dom cctx1 c →
+            dom cctx2 c →
+            ⊥
+
+  data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
+    TALam  : ∀{Δ Σ' Γ x e τ1 τ2} →
+               x # Γ →
+               Δ , Σ' , (Γ ,, (x , τ1)) ⊢ e :: τ2 →
+               Δ , Σ' , Γ ⊢ ·λ x => e :: τ1 ==> τ2
+    TAFix  : ∀{Δ Σ' Γ f x e τ1 τ2} →
+               f # Γ →
+               x # Γ →
+               Δ , Σ' , (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢ e :: τ2 →
+               Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ1 ==> τ2
+    TAVar  : ∀{Δ Σ' Γ x τ} → (x , τ) ∈ Γ → Δ , Σ' , Γ ⊢ X[ x ] :: τ
+    TAApp  : ∀{Δ Σ' Γ f arg τ1 τ2} →
+               holes-disjoint f arg →
+               Δ , Σ' , Γ ⊢ f :: τ1 ==> τ2 →
+               Δ , Σ' , Γ ⊢ arg :: τ1 →
+               Δ , Σ' , Γ ⊢ f ∘ arg :: τ2
+    TATpl  : ∀{Δ Σ' Γ es τs} →
+               ∥ es ∥ == ∥ τs ∥ →
+               (∀{i j} →
+                  (i<∥es∥ : i < ∥ es ∥) →
+                  (j<∥es∥ : j < ∥ es ∥) →
+                  i ≠ j →
+                  holes-disjoint (es ⟦ i given i<∥es∥ ⟧) (es ⟦ j given j<∥es∥ ⟧)) →
+               (∀{i} →
+                  (i<∥es∥ : i < ∥ es ∥) →
+                  (i<∥τs∥ : i < ∥ τs ∥) →
+                  Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)) →
+               Δ , Σ' , Γ ⊢ ⟨ es ⟩ :: ⟨ τs ⟩
+    TAGet  : ∀{Δ Σ' Γ i e τs} →
+               (i<∥τs∥ : i < ∥ τs ∥) →
+               Δ , Σ' , Γ ⊢ e :: ⟨ τs ⟩ →
+               Δ , Σ' , Γ ⊢ get[ i th-of ∥ τs ∥ ] e :: (τs ⟦ i given i<∥τs∥ ⟧)
+    TACtor : ∀{Δ Σ' Γ d cctx c e τ} →
+               (d , cctx) ∈ π1 Σ' →
+               (c , τ) ∈ cctx →
+               Δ , Σ' , Γ ⊢ e :: τ →
+               Δ , Σ' , Γ ⊢ C[ c ] e :: D[ d ]
+    TACase : ∀{Δ Σ' Γ d cctx e rules τ} →
+               (d , cctx) ∈ π1 Σ' →
+               Δ , Σ' , Γ ⊢ e :: D[ d ] →
+               (∀{c} →
+                  dom cctx c →
+                  -- There must be a rule for each constructor, i.e. case exhuastiveness
+                  Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
+               (∀{i ci xi ei} →
+                  (i<∥rules∥ : i < ∥ rules ∥) →
+                  |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
+                  holes-disjoint ei e ∧
+                  (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → holes-disjoint ei (rule.branch (rules ⟦ j given j<∥rules∥ ⟧))) ∧
+                  -- The constructor of each rule must be of the right datatype, and the branch must type-check
+                  Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
+               Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
+    TAHole : ∀{Δ Σ' Γ u Γ' τ} → (u , (Γ' , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
 
   mutual
     env : Set
@@ -94,10 +157,7 @@ module core where
     FCon  : ∀{c r} → r final → (C[ c ] r) final
     FHole : ∀{E u} → [ E ]??[ u ] final
     FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
-    -- TODO what if r = ⟨ rs ⟩ but it has the wrong length?
-    -- TODO what about i >= n? should we check that in the syntax too?
     FGet  : ∀{i n r} → r final → (∀{rs} → r ≠ ⟨ rs ⟩) → (get[ i th-of n ] r) final
-    -- TODO what if r = C[ c ] r' but c is of the wrong sort?
     FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → [ E ]case r of⦃· rules ·⦄ final
 
   -- Big step evaluation
@@ -139,16 +199,13 @@ module core where
                          (h : i < ∥ rs ∥) →
                          E ⊢ e ⇒ ⟨ rs ⟩ ⊣ k →
                          E ⊢ get[ i th-of ∥ rs ∥ ] e ⇒ (rs ⟦ i given h ⟧) ⊣ k
-    -- TODO what if e evals to a tuple, but it has the wrong length?
     EGetUnfinished   : ∀{E i n e r k} → E ⊢ e ⇒ r ⊣ k → (∀{rs} → r ≠ ⟨ rs ⟩) → E ⊢ get[ i th-of n ] e ⇒ (get[ i th-of n ] r) ⊣ k
-    -- TODO what if the same ctor appears in two case rules?
     EMatch           : ∀{E e rules j Cj xj ej r' k' r k} →
                          (h : j < ∥ rules ∥) →
                          |C[ Cj ] xj => ej == rules ⟦ j given h ⟧ →
                          E ⊢ e ⇒ (C[ Cj ] r') ⊣ k' →
                          (E ,, (xj , r')) ⊢ ej ⇒ r ⊣ k →
                          E ⊢ case e of⦃· rules ·⦄ ⇒ r ⊣ k' ++ k
-    -- TODO what if e evals to a ctor, but that ctor doesn't appear in a case branch?
     EMatchUnfinished : ∀{E e rules r k} →
                          E ⊢ e ⇒ r ⊣ k →
                          (∀{j e'} → r ≠ (C[ j ] e')) →

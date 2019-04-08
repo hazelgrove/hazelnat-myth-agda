@@ -108,8 +108,8 @@ module core where
     EVar             : ∀{E x r} → (x , r) ∈ E → E ⊢ X[ x ] ⇒ r ⊣ []
     EHole            : ∀{E u} → E ⊢ ??[ u ] ⇒ [ E ]??[ u ] ⊣ []
     ETuple           : ∀{E es rs ks} →
-                         (leqh1 : ∥ es ∥ == ∥ rs ∥) →
-                         (leqh2 : ∥ es ∥ == ∥ ks ∥) →
+                         ∥ es ∥ == ∥ rs ∥ →
+                         ∥ es ∥ == ∥ ks ∥ →
                          -- TODO this should probably factored out somehow
                          (∀{i} →
                             (h : i < ∥ es ∥) →

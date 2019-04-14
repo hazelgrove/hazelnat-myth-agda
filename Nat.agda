@@ -1,11 +1,33 @@
 open import Prelude
 
 module Nat where
+
+  -- definitions
+
   data Nat : Set where
     Z : Nat
     1+ : Nat → Nat
 
   {-# BUILTIN NATURAL Nat #-}
+
+  _+_ : Nat → Nat → Nat
+  Z + m = m
+  1+ n + m = 1+ (n + m)
+
+  infixl 60 _+_
+
+  data _≤_ : Nat → Nat → Set where
+    ≤refl  : ∀{n} → n ≤ n
+    ≤1+    : ∀{n m} → n ≤ m → n ≤ 1+ m
+
+  infix 40 _≤_
+
+  _<_ : Nat → Nat → Set
+  n < m = n ≤ m ∧ n ≠ m
+
+  infix 40 _<_
+
+  -- basic theorems
 
   -- the succ operation is injective
   1+inj : ∀{n m} → 1+ n == 1+ m → n == m
@@ -31,11 +53,7 @@ module Nat where
   natEQ (1+ x) (1+ .x) | Inl refl = Inl refl
   ... | Inr b = Inr (λ x₁ → b (1+inj x₁))
 
-  _+_ : Nat → Nat → Nat
-  Z + m = m
-  1+ n + m = 1+ (n + m)
-
-  infixl 60 _+_
+  -- _+_ theorems
 
   n+Z==n : ∀{n} → n + Z == n
   n+Z==n {Z} = refl
@@ -55,11 +73,7 @@ module Nat where
   +assc {Z} = refl
   +assc {1+ a} = 1+ap (+assc {a})
 
-  data _≤_ : Nat → Nat → Set where
-    ≤refl  : ∀{n} → n ≤ n
-    ≤1+    : ∀{n m} → n ≤ m → n ≤ 1+ m
-
-  infix 40 _≤_
+  -- _≤_ theorems
 
   0≤n : ∀{n} → Z ≤ n
   0≤n {Z} = ≤refl
@@ -97,8 +111,7 @@ module Nat where
   ≤antisym {n} {.n} ≤refl m≤n = refl
   ≤antisym {n} {.(1+ _)} (≤1+ h1) h2 = abort (1+n≰n (≤trans h2 h1))
 
-  _<_ : Nat → Nat → Set
-  n < m = n ≤ m ∧ n ≠ m
+  -- _<_ theorems
 
   n≮0 : ∀{n} → n < Z → ⊥
   n≮0 {Z} (π3 , π4) = π4 refl
@@ -119,5 +132,3 @@ module Nat where
 
   n<m→1+n<1+m : ∀{n m} → n < m → 1+ n < 1+ m
   n<m→1+n<1+m (π3 , π4) = n≤m→1+n≤1+m π3 , 1+inj-cp π4
-
-  infix 40 _<_

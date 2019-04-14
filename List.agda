@@ -4,6 +4,8 @@ open import Agda.Primitive using (Level; lzero; lsuc) renaming (_⊔_ to lmax)
 
 module List where
 
+  -- definitions
+
   data List {l : Level} (A : Set l) : Set l where
     [] : List A
     _::_ : A → List A → List A
@@ -14,43 +16,48 @@ module List where
 
   infixl 50 _++_
 
-  ++assc : ∀{l A a1 a2 a3} → (_++_ {l} {A} a1 a2) ++ a3 == a1 ++ (a2 ++ a3)
-  ++assc {l} {A} {[]} {a2} {a3} = refl
-  ++assc {l} {A} {x :: a1} {a2} {a3} with a1 ++ a2 ++ a3 | ++assc {l} {A} {a1} {a2} {a3}
-  ++assc {l} {A} {x :: a1} {a2} {a3} | _ | refl = refl
-
-  map : {lA lB : Level} → {A : Set lA} → {B : Set lB} → (A → B) → List A → List B
-  map f [] = []
-  map f (a :: as) = f a :: map f as
-
-  map-++-comm : ∀{l1 l2 A B f a b} → map f a ++ map f b == map {l1} {l2} {A} {B} f (a ++ b)
-  map-++-comm {a = []} = refl
-  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} with map f (t ++ b) | map-++-comm {l1} {l2} {A} {B} {f} {t} {b}
-  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} | _ | refl = refl
-
   ∥_∥ : {l : Level} {A : Set l} → List A → Nat
   ∥ [] ∥ = Z
   ∥ a :: as ∥ = 1+ ∥ as ∥
-
-  ∥-++-comm : ∀{l A a1 a2} → ∥ a1 ∥ + (∥_∥ {l} {A} a2) == ∥ a1 ++ a2 ∥
-  ∥-++-comm {l} {A} {[]} {a2} = refl
-  ∥-++-comm {l} {A} {a :: a1} {a2} = 1+ap (∥-++-comm {l} {A} {a1})
 
   _⟦_given_⟧ : {l : Level} {A : Set l} → (la : List A) → (i : Nat) → i < ∥ la ∥ → A
   [] ⟦ i given h ⟧ = abort (n≮0 h)
   (a :: as) ⟦ Z given h ⟧ = a
   (a :: as) ⟦ 1+ i given h ⟧ = as ⟦ i given 1+n<1+m→n<m h ⟧
 
+  map : {lA lB : Level} → {A : Set lA} → {B : Set lB} → (A → B) → List A → List B
+  map f [] = []
+  map f (a :: as) = f a :: map f as
+
+  foldl : {ℓ1 ℓ2 : Level} → {A : Set ℓ1} → {B : Set ℓ2} → (B → A → B) → B → List A → B
+  foldl f b [] = b
+  foldl f b (a :: as) = foldl f (f b a) as
+
+  -- _++_ theorem
+  ++assc : ∀{l A a1 a2 a3} → (_++_ {l} {A} a1 a2) ++ a3 == a1 ++ (a2 ++ a3)
+  ++assc {l} {A} {[]} {a2} {a3} = refl
+  ++assc {l} {A} {x :: a1} {a2} {a3} with a1 ++ a2 ++ a3 | ++assc {l} {A} {a1} {a2} {a3}
+  ++assc {l} {A} {x :: a1} {a2} {a3} | _ | refl = refl
+
+  -- map theorem
+  map-++-comm : ∀{l1 l2 A B f a b} → map f a ++ map f b == map {l1} {l2} {A} {B} f (a ++ b)
+  map-++-comm {a = []} = refl
+  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} with map f (t ++ b) | map-++-comm {l1} {l2} {A} {B} {f} {t} {b}
+  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} | _ | refl = refl
+
+  -- ∥_∥ theorem
+  ∥-++-comm : ∀{l A a1 a2} → ∥ a1 ∥ + (∥_∥ {l} {A} a2) == ∥ a1 ++ a2 ∥
+  ∥-++-comm {l} {A} {[]} {a2} = refl
+  ∥-++-comm {l} {A} {a :: a1} {a2} = 1+ap (∥-++-comm {l} {A} {a1})
+
+  -- _⟦_given_⟧ theorem
   ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a : {l : Level} {A : Set l} {l1 l2 : List A} {a : A} →
                              (h : ∥ l1 ∥ < ∥ l1 ++ (a :: []) ++ l2 ∥) →
                              ((l1 ++ (a :: []) ++ l2) ⟦ ∥ l1 ∥ given h ⟧ == a)
   ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = []} h = refl
   ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = a1 :: l1rest} {l2} {a} h = ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = l1rest} {l2} {a} (1+n<1+m→n<m h)
 
-  foldl : {ℓ1 ℓ2 : Level} → {A : Set ℓ1} → {B : Set ℓ2} → (B → A → B) → B → List A → B
-  foldl f b [] = b
-  foldl f b (a :: as) = foldl f (f b a) as
-
+  -- foldl theorem
   foldl-++ : {ℓ1 ℓ2 : Level} {A : Set ℓ1} {B : Set ℓ2} {l1 l2 : List A} {f : B → A → B} {b0 : B} →
               foldl f b0 (l1 ++ l2) == foldl f (foldl f b0 l1) l2
   foldl-++ {l1 = []} = refl

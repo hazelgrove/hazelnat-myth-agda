@@ -119,6 +119,7 @@ module core where
                   -- There must be a rule for each constructor, i.e. case exhuastiveness
                   Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
                (∀{i ci xi ei} →
+                  xi # Γ →
                   (i<∥rules∥ : i < ∥ rules ∥) →
                   |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
                   holes-disjoint ei e ∧
@@ -126,7 +127,8 @@ module core where
                   -- The constructor of each rule must be of the right datatype, and the branch must type-check
                   Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
                Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
-    TAHole : ∀{Δ Σ' Γ u Γ' τ} → (u , (Γ' , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
+    -- TODO we may have a problem with weakening
+    TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
 
   mutual
     env : Set

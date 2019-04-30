@@ -70,9 +70,7 @@ module core where
             d1 ≠ d2 →
             (d1 , cctx1) ∈ dctx →
             (d2 , cctx2) ∈ dctx →
-            dom cctx1 c →
-            dom cctx2 c →
-            ⊥
+            c # cctx1 ∨ c # cctx2
 
   data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
     TALam  : ∀{Δ Σ' Γ x e τ1 τ2} →
@@ -102,10 +100,11 @@ module core where
                   (i<∥τs∥ : i < ∥ τs ∥) →
                   Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)) →
                Δ , Σ' , Γ ⊢ ⟨ es ⟩ :: ⟨ τs ⟩
-    TAGet  : ∀{Δ Σ' Γ i e τs} →
+    TAGet  : ∀{Δ Σ' Γ i e n τs} →
+               n == ∥ τs ∥ → -- this awkwardness is necessary to permit unification
                (i<∥τs∥ : i < ∥ τs ∥) →
                Δ , Σ' , Γ ⊢ e :: ⟨ τs ⟩ →
-               Δ , Σ' , Γ ⊢ get[ i th-of ∥ τs ∥ ] e :: (τs ⟦ i given i<∥τs∥ ⟧)
+               Δ , Σ' , Γ ⊢ get[ i th-of n ] e :: (τs ⟦ i given i<∥τs∥ ⟧)
     TACtor : ∀{Δ Σ' Γ d cctx c e τ} →
                (d , cctx) ∈ π1 Σ' →
                (c , τ) ∈ cctx →
@@ -119,13 +118,14 @@ module core where
                   -- There must be a rule for each constructor, i.e. case exhuastiveness
                   Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
                (∀{i ci xi ei} →
-                  xi # Γ →
                   (i<∥rules∥ : i < ∥ rules ∥) →
                   |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
-                  holes-disjoint ei e ∧
-                  (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → holes-disjoint ei (rule.branch (rules ⟦ j given j<∥rules∥ ⟧))) ∧
-                  -- The constructor of each rule must be of the right datatype, and the branch must type-check
-                  Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
+                    xi # Γ ∧
+                    (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → xi ≠ rule.parm (rules ⟦ j given j<∥rules∥ ⟧)) ∧
+                    holes-disjoint ei e ∧
+                    (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → holes-disjoint ei (rule.branch (rules ⟦ j given j<∥rules∥ ⟧))) ∧
+                    -- The constructor of each rule must be of the right datatype, and the branch must type-check
+                    Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
                Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
     -- TODO we may have a problem with weakening
     TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
@@ -145,72 +145,85 @@ module core where
       get[_th-of_]_    : Nat → Nat → result → result
       [_]case_of⦃·_·⦄ : env → result → List rule → result
 
-  -- values are final and do not have holes
-  data _value : result → Set where
-    VLam : ∀{E x e} → ([ E ]λ x => e) value
-    VFix : ∀{E f x e} → [ E ]fix f ⦇·λ x => e ·⦈ value
-    VTpl : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) value) → ⟨ rs ⟩ value
-    VCon : ∀{c r} → r value → (C[ c ] r) value
+  mutual
+    data _env-final : env → Set where
+      EF : (E : env) → (∀{x rx} → (x , rx) ∈ E → rx final) → E env-final
 
-  -- final results are those that cannot be evaluated further
-  data _final : result → Set where
-    FVal  : ∀{r} → r value → r final
-    FTpl  : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) final) → ⟨ rs ⟩ final
-    FCon  : ∀{c r} → r final → (C[ c ] r) final
-    FHole : ∀{E u} → [ E ]??[ u ] final
-    FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
-    FGet  : ∀{i n r} → r final → (∀{rs} → r ≠ ⟨ rs ⟩) → (get[ i th-of n ] r) final
-    FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → [ E ]case r of⦃· rules ·⦄ final
+    -- values are final and do not have holes,
+    -- but the env of a closure can contain results that have holes
+    data _value : result → Set where
+      VLam : ∀{E x e} → E env-final → ([ E ]λ x => e) value
+      VFix : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ value
+      VTpl : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) value) → ⟨ rs ⟩ value
+      VCon : ∀{c r} → r value → (C[ c ] r) value
 
-  data _,_⊢_·:_ : hctx → denv → result → typ → Set where
-    TALam  : ∀{Δ Σ' Γ E x e τ} →
-               (∀{v rv} → (v , rv) ∈ E → Σ[ τv ∈ typ ] ((v , τv) ∈ Γ ∧ Δ , Σ' ⊢ rv ·: τv)) →
-               Δ , Σ' , Γ ⊢ ·λ x => e :: τ →
-               Δ , Σ' ⊢ [ E ]λ x => e ·: τ
-    TAFix  : ∀{Δ Σ' Γ E f x e τ} →
-               (∀{v rv} → (v , rv) ∈ E → Σ[ τv ∈ typ ] ((v , τv) ∈ Γ ∧ Δ , Σ' ⊢ rv ·: τv)) →
-               Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ →
-               Δ , Σ' ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ·: τ
-    TAApp  : ∀{Δ Σ' f arg τ1 τ2} →
-               Δ , Σ' ⊢ f ·: τ1 ==> τ2 →
-               Δ , Σ' ⊢ arg ·: τ1 →
-               Δ , Σ' ⊢ f ∘ arg ·: τ2
-    TATpl  : ∀{Δ Σ' rs τs} →
-               ∥ rs ∥ == ∥ τs ∥ →
-               (∀{i} →
-                  (i<∥rs∥ : i < ∥ rs ∥) →
-                  (i<∥τs∥ : i < ∥ τs ∥) →
-                  Δ , Σ' ⊢ rs ⟦ i given i<∥rs∥ ⟧ ·: (τs ⟦ i given i<∥τs∥ ⟧)) →
-               Δ , Σ' ⊢ ⟨ rs ⟩ ·: ⟨ τs ⟩
-    TAGet  : ∀{Δ Σ' i r τs} →
-               (i<∥τs∥ : i < ∥ τs ∥) →
-               Δ , Σ' ⊢ r ·: ⟨ τs ⟩ →
-               Δ , Σ' ⊢ get[ i th-of ∥ τs ∥ ] r ·: (τs ⟦ i given i<∥τs∥ ⟧)
-    TACtor : ∀{Δ Σ' d cctx c r τ} →
-               (d , cctx) ∈ π1 Σ' →
-               (c , τ) ∈ cctx →
-               Δ , Σ' ⊢ r ·: τ →
-               Δ , Σ' ⊢ C[ c ] r ·: D[ d ]
-    TACase : ∀{Δ Σ' Γ E d cctx r rules τ} →
-               (d , cctx) ∈ π1 Σ' →
-               (∀{v rv} → (v , rv) ∈ E → Σ[ τv ∈ typ ] ((v , τv) ∈ Γ ∧ Δ , Σ' ⊢ rv ·: τv)) →
-               Δ , Σ' ⊢ r ·: D[ d ] →
-               (∀{c} →
-                  dom cctx c →
-                  -- There must be a rule for each constructor, i.e. case exhuastiveness
-                  Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
-               (∀{i ci xi ei} →
-                  xi # Γ →
-                  (i<∥rules∥ : i < ∥ rules ∥) →
-                  |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
-                  -- The constructor of each rule must be of the right datatype, and the branch must type-check
-                  Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
-               Δ , Σ' ⊢ [ E ]case r of⦃· rules ·⦄ ·: τ
-    TAHole : ∀{Δ Σ' Γ E u τ} →
-               (u , (Γ , τ)) ∈ Δ →
-               (∀{v rv} → (v , rv) ∈ E → Σ[ τv ∈ typ ] ((v , τv) ∈ Γ ∧ Δ , Σ' ⊢ rv ·: τv)) →
-               (∀{v} → dom Γ v → dom E v) →
-               Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
+    -- final results are those that cannot be evaluated further
+    data _final : result → Set where
+      FVal  : ∀{r} → r value → r final
+      FTpl  : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) final) → ⟨ rs ⟩ final
+      FCon  : ∀{c r} → r final → (C[ c ] r) final
+      FHole : ∀{E u} → E env-final → [ E ]??[ u ] final
+      FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
+      FGet  : ∀{i n r} → r final → (∀{rs} → r ≠ ⟨ rs ⟩) → (get[ i th-of n ] r) final
+      FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → E env-final → [ E ]case r of⦃· rules ·⦄ final
+
+  mutual
+    data _,_,_⊢_ : hctx → denv → tctx → env → Set where
+      EnvId  : ∀{Δ Σ'} → Δ , Σ' , ∅ ⊢ ∅
+      EnvInd : ∀{Δ Σ' Γ E x τx rx} →
+                 Δ , Σ' , Γ ⊢ E →
+                 Δ , Σ' ⊢ rx ·: τx →
+                 Δ , Σ' , (Γ ,, (x , τx)) ⊢ (E ,, (x , rx))
+
+    data _,_⊢_·:_ : hctx → denv → result → typ → Set where
+      TALam  : ∀{Δ Σ' Γ E x e τ} →
+                 Δ , Σ' , Γ ⊢ E →
+                 Δ , Σ' , Γ ⊢ ·λ x => e :: τ →
+                 Δ , Σ' ⊢ [ E ]λ x => e ·: τ
+      TAFix  : ∀{Δ Σ' Γ E f x e τ} →
+                 Δ , Σ' , Γ ⊢ E →
+                 Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ →
+                 Δ , Σ' ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ·: τ
+      TAApp  : ∀{Δ Σ' f arg τ1 τ2} →
+                 Δ , Σ' ⊢ f ·: τ1 ==> τ2 →
+                 Δ , Σ' ⊢ arg ·: τ1 →
+                 Δ , Σ' ⊢ f ∘ arg ·: τ2
+      TATpl  : ∀{Δ Σ' rs τs} →
+                 ∥ rs ∥ == ∥ τs ∥ →
+                 (∀{i} →
+                    (i<∥rs∥ : i < ∥ rs ∥) →
+                    (i<∥τs∥ : i < ∥ τs ∥) →
+                    Δ , Σ' ⊢ rs ⟦ i given i<∥rs∥ ⟧ ·: (τs ⟦ i given i<∥τs∥ ⟧)) →
+                 Δ , Σ' ⊢ ⟨ rs ⟩ ·: ⟨ τs ⟩
+      TAGet  : ∀{Δ Σ' i r τs} →
+                 (i<∥τs∥ : i < ∥ τs ∥) →
+                 Δ , Σ' ⊢ r ·: ⟨ τs ⟩ →
+                 Δ , Σ' ⊢ get[ i th-of ∥ τs ∥ ] r ·: (τs ⟦ i given i<∥τs∥ ⟧)
+      TACtor : ∀{Δ Σ' d cctx c r τ} →
+                 (d , cctx) ∈ π1 Σ' →
+                 (c , τ) ∈ cctx →
+                 Δ , Σ' ⊢ r ·: τ →
+                 Δ , Σ' ⊢ C[ c ] r ·: D[ d ]
+      TACase : ∀{Δ Σ' Γ E d cctx r rules τ} →
+                 (d , cctx) ∈ π1 Σ' →
+                 Δ , Σ' , Γ ⊢ E →
+                 Δ , Σ' ⊢ r ·: D[ d ] →
+                 (∀{c} →
+                    dom cctx c →
+                    -- There must be a rule for each constructor, i.e. case exhuastiveness
+                    Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
+                 (∀{i ci xi ei} →
+                    (i<∥rules∥ : i < ∥ rules ∥) →
+                    |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
+                      xi # Γ ∧
+                      (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → xi ≠ rule.parm (rules ⟦ j given j<∥rules∥ ⟧)) ∧
+                      -- The constructor of each rule must be of the right datatype, and the branch must type-check
+                      Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
+                 Δ , Σ' ⊢ [ E ]case r of⦃· rules ·⦄ ·: τ
+      TAHole : ∀{Δ Σ' Γ E u τ} →
+                 (u , (Γ , τ)) ∈ Δ →
+                 Δ , Σ' , Γ ⊢ E →
+                 Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
 
   -- Big step evaluation
   -- TODO : Change List ⊤ to K or List K or whatever
@@ -262,9 +275,6 @@ module core where
                          E ⊢ e ⇒ r ⊣ k →
                          (∀{j e'} → r ≠ (C[ j ] e')) →
                          E ⊢ case e of⦃· rules ·⦄ ⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
-
-    -- TODO metathm that evaluation always results in a final
-    -- TODO metathm that holes-disjoint implies constraints-disjoint, and one that constraints produced by evaluation have index uniqueness
 
 {- TODO
 

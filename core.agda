@@ -13,8 +13,87 @@ module core where
   -- arrow type constructors bind very tightly
   infixr 25  _==>_
 
-  -- Expressions (Sketches)
+  tctx = typ ctx
+  hctx = (tctx ∧ typ) ctx
+  denv = Σ[ dctx ∈ tctx ctx ]
+    ∀{d1 d2 cctx1 cctx2 c} →
+    d1 ≠ d2 →
+    (d1 , cctx1) ∈ dctx →
+    (d2 , cctx2) ∈ dctx →
+    c # cctx1 ∨ c # cctx2
+
   mutual
+    -- examples
+    data ex : Set where
+      PF    : pf → ex
+      ⟨_⟩   : List ex → ex
+      C[_]_ : Nat → ex → ex
+
+    -- partial functions
+    pf = List (result ∧ ex)
+
+    data _ex-complete : ex → Set where
+      EXCPF   : ∀{pf} → pf pf-complete → (PF pf) ex-complete
+      EXCTpl  : ∀{exs} → (∀{i} → (i<∥exs∥ : i < ∥ exs ∥) → exs ⟦ i given i<∥exs∥ ⟧ ex-complete) → ⟨ exs ⟩ ex-complete
+      EXCCtor : ∀{c ex} → ex ex-complete → (C[ c ] ex) ex-complete
+
+    data _pf-complete : pf → Set where
+      PFC : ∀{pf} →
+              (∀{i r ex} →
+                 (i<∥pf∥ : i < ∥ pf ∥) →
+                 (r , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 r rcomplete ∧ ex ex-complete) →
+              pf pf-complete
+
+    data _ex-value : ex → Set where
+      EXVPF   : ∀{pf} → pf pf-value → (PF pf) ex-value
+      EXVTpl  : ∀{exs} → (∀{i} → (i<∥exs∥ : i < ∥ exs ∥) → exs ⟦ i given i<∥exs∥ ⟧ ex-value) → ⟨ exs ⟩ ex-value
+      EXVCtor : ∀{c ex} → ex ex-value → (C[ c ] ex) ex-value
+
+    data _pf-value : pf → Set where
+      PFV : ∀{pf} →
+              (∀{i v ex} →
+                 (i<∥pf∥ : i < ∥ pf ∥) →
+                 (v , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 v value ∧ ex ex-value) →
+              pf pf-value
+
+    data _ex-final : ex → Set where
+      EXFPF   : ∀{pf} → pf pf-final → (PF pf) ex-final
+      EXFTpl  : ∀{exs} → (∀{i} → (i<∥exs∥ : i < ∥ exs ∥) → exs ⟦ i given i<∥exs∥ ⟧ ex-final) → ⟨ exs ⟩ ex-final
+      EXFCtor : ∀{c ex} → ex ex-final → (C[ c ] ex) ex-final
+
+    data _pf-final : pf → Set where
+      PFF : ∀{pf} →
+              (∀{i f ex} →
+                 (i<∥pf∥ : i < ∥ pf ∥) →
+                 (f , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 f final ∧ ex ex-final) →
+              pf pf-final
+
+    -- type assignment for examples. only complete examples can type-check
+    data _⊢_:·_ : denv → ex → typ → Set where
+      TATpl  : ∀{Σ' exs τs} →
+                 ∥ exs ∥ == ∥ τs ∥ →
+                 (∀{i} →
+                    (i<∥exs∥ : i < ∥ exs ∥) →
+                    (i<∥τs∥ : i < ∥ τs ∥) →
+                    Σ' ⊢ exs ⟦ i given i<∥exs∥ ⟧ :· (τs ⟦ i given i<∥τs∥ ⟧)) →
+                 Σ' ⊢ ⟨ exs ⟩ :· ⟨ τs ⟩
+      TACtor : ∀{Σ' d cctx c ex τ} →
+                 (d , cctx) ∈ π1 Σ' →
+                 (c , τ) ∈ cctx →
+                 Σ' ⊢ ex :· τ →
+                 Σ' ⊢ C[ c ] ex :· D[ d ]
+      TAPF   : ∀{Σ' pf τ1 τ2} →
+                 (∀{i v ex} →
+                    (i<∥pf∥ : i < ∥ pf ∥) →
+                    (v , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                    v value ∧ (∅ , Σ' ⊢ v ·: τ1) ∧ Σ' ⊢ ex :· τ2) →
+                 Σ' ⊢ PF pf :· τ1 ==> τ2
+
+    -- TODO proof that if an example type-checks, it's complete
+
     record rule : Set where
       inductive
       constructor |C[_]_=>_
@@ -23,116 +102,150 @@ module core where
         parm   : Nat
         branch : exp
 
+    -- Expressions (Sketches)
     data exp : Set where
-      ·λ_=>_         : Nat → exp → exp
-      fix_⦇·λ_=>_·⦈  : Nat → Nat → exp → exp
-      X[_]           : Nat → exp
-      _∘_            : exp → exp → exp
-      ⟨_⟩            : List exp → exp
-      get[_th-of_]_  : Nat → Nat → exp → exp
-      C[_]_          : Nat → exp → exp
-      case_of⦃·_·⦄  : exp → List rule → exp
-      ??[_]          : Nat → exp
+      ·λ_=>_        : Nat → exp → exp
+      fix_⦇·λ_=>_·⦈ : Nat → Nat → exp → exp
+      X[_]          : Nat → exp
+      _∘_           : exp → exp → exp
+      ⟨_⟩           : List exp → exp
+      get[_th-of_]_ : Nat → Nat → exp → exp
+      C[_]_         : Nat → exp → exp
+      case_of⦃·_·⦄ : exp → List rule → exp
+      ??[_]         : Nat → exp
+      PF            : pf → exp
+      PBE:assert    : exp → exp → exp
 
-  data hole-name-new : (e : exp) → (u : Nat) → Set where
-    HNNLam  : ∀{x e u} → hole-name-new e u → hole-name-new (·λ x => e) u
-    HNNFix  : ∀{x f e u} → hole-name-new e u → hole-name-new (fix f ⦇·λ x => e ·⦈) u
-    HNNVar  : ∀{x u} → hole-name-new (X[ x ]) u
-    HNNAp   : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (e1 ∘ e2) u
-    HNNTup  : ∀{es u} → (∀{i} → (h : i < ∥ es ∥) → hole-name-new (es ⟦ i given h ⟧) u) → hole-name-new ⟨ es ⟩ u
-    HNNGet  : ∀{i n e u} → hole-name-new e u → hole-name-new (get[ i th-of n ] e) u
-    HNNCtor : ∀{c e u} → hole-name-new e u → hole-name-new (C[ c ] e) u
-    HNNCase : ∀{e rules u} →
-                hole-name-new e u →
-                (∀{i} → (h : i < ∥ rules ∥) → hole-name-new (rule.branch (rules ⟦ i given h ⟧)) u) →
-                hole-name-new (case e of⦃· rules ·⦄) u
-    HNNHole : ∀{u' u} → u' ≠ u → hole-name-new (??[ u' ]) u
+    data hole-name-new : (e : exp) → (u : Nat) → Set where
+      HNNLam  : ∀{x e u} → hole-name-new e u → hole-name-new (·λ x => e) u
+      HNNFix  : ∀{x f e u} → hole-name-new e u → hole-name-new (fix f ⦇·λ x => e ·⦈) u
+      HNNVar  : ∀{x u} → hole-name-new (X[ x ]) u
+      HNNAp   : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (e1 ∘ e2) u
+      HNNTup  : ∀{es u} → (∀{i} → (h : i < ∥ es ∥) → hole-name-new (es ⟦ i given h ⟧) u) → hole-name-new ⟨ es ⟩ u
+      HNNGet  : ∀{i n e u} → hole-name-new e u → hole-name-new (get[ i th-of n ] e) u
+      HNNCtor : ∀{c e u} → hole-name-new e u → hole-name-new (C[ c ] e) u
+      HNNCase : ∀{e rules u} →
+                  hole-name-new e u →
+                  (∀{i} → (h : i < ∥ rules ∥) → hole-name-new (rule.branch (rules ⟦ i given h ⟧)) u) →
+                  hole-name-new (case e of⦃· rules ·⦄) u
+      HNNHole : ∀{u' u} → u' ≠ u → hole-name-new (??[ u' ]) u
+      -- pf shouldn't be incomplete, so we don't define a case for incomplete pfs in which the hole would
+      -- nonetheless be new
+      HNNPF   : ∀{pf u} → pf pf-complete → hole-name-new (PF pf) u
+      HNNAsrt : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (PBE:assert e1 e2) u
 
-  -- two terms that do not share any hole names
-  data holes-disjoint : (e1 : exp) → (e2 : exp) → Set where
-    HDLam  : ∀{x e e'} → holes-disjoint e e' → holes-disjoint (·λ x => e) e'
-    HDFix  : ∀{x f e e'} → holes-disjoint e e' → holes-disjoint (fix f ⦇·λ x => e ·⦈) e'
-    HDVar  : ∀{x e'} → holes-disjoint (X[ x ]) e'
-    HDAp   : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (e1 ∘ e2) e'
-    HDTup  : ∀{es e'} → (∀{i} → (h : i < ∥ es ∥) → holes-disjoint (es ⟦ i given h ⟧) e') → holes-disjoint ⟨ es ⟩ e'
-    HDGet  : ∀{i n e e'} → holes-disjoint e e' → holes-disjoint (get[ i th-of n ] e) e'
-    HDCtor : ∀{c e e'} → holes-disjoint e e' → holes-disjoint (C[ c ] e) e'
-    HDCase : ∀{e rules e'} →
-               holes-disjoint e e' →
-               (∀{i} → (h : i < ∥ rules ∥) → holes-disjoint (rule.branch (rules ⟦ i given h ⟧)) e') →
-               holes-disjoint (case e of⦃· rules ·⦄) e'
-    HDHole : ∀{u e'} → hole-name-new e' u → holes-disjoint (??[ u ]) e'
+    data holes-disjoint : (e1 : exp) → (e2 : exp) → Set where
+      HDLam  : ∀{x e e'} → holes-disjoint e e' → holes-disjoint (·λ x => e) e'
+      HDFix  : ∀{x f e e'} → holes-disjoint e e' → holes-disjoint (fix f ⦇·λ x => e ·⦈) e'
+      HDVar  : ∀{x e'} → holes-disjoint (X[ x ]) e'
+      HDAp   : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (e1 ∘ e2) e'
+      HDTup  : ∀{es e'} → (∀{i} → (h : i < ∥ es ∥) → holes-disjoint (es ⟦ i given h ⟧) e') → holes-disjoint ⟨ es ⟩ e'
+      HDGet  : ∀{i n e e'} → holes-disjoint e e' → holes-disjoint (get[ i th-of n ] e) e'
+      HDCtor : ∀{c e e'} → holes-disjoint e e' → holes-disjoint (C[ c ] e) e'
+      HDCase : ∀{e rules e'} →
+                 holes-disjoint e e' →
+                 (∀{i} → (h : i < ∥ rules ∥) → holes-disjoint (rule.branch (rules ⟦ i given h ⟧)) e') →
+                 holes-disjoint (case e of⦃· rules ·⦄) e'
+      HDHole : ∀{u e'} → hole-name-new e' u → holes-disjoint (??[ u ]) e'
+      -- pf shouldn't be incomplete, so we don't define a case for incomplete pfs in which the holes would
+      -- nonetheless be disjoint
+      HDPF   : ∀{pf e'} → pf pf-complete → holes-disjoint (PF pf) e'
+      HDAsrt : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (PBE:assert e1 e2) e'
 
-  tctx = typ ctx
-  hctx = (tctx ∧ typ) ctx
-  denv = Σ[ dctx ∈ tctx ctx ]
-          ∀{d1 d2 cctx1 cctx2 c} →
-            d1 ≠ d2 →
-            (d1 , cctx1) ∈ dctx →
-            (d2 , cctx2) ∈ dctx →
-            c # cctx1 ∨ c # cctx2
+    data _ecomplete : exp → Set where
+      ECLam  : ∀{x e} → e ecomplete → (·λ x => e) ecomplete
+      ECFix  : ∀{f x e} → e ecomplete → fix f ⦇·λ x => e ·⦈ ecomplete
+      ECVar  : ∀{x} → X[ x ] ecomplete
+      ECAp   : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (e1 ∘ e2) ecomplete
+      ECTpl  : ∀{es} → (∀{i} → (i<∥es∥ : i < ∥ es ∥) → es ⟦ i given i<∥es∥ ⟧ ecomplete) → ⟨ es ⟩ ecomplete
+      ECGet  : ∀{i n e} → e ecomplete → (get[ i th-of n ] e) ecomplete
+      ECCtor : ∀{c e} → e ecomplete → (C[ c ] e) ecomplete
+      ECCase : ∀{e rules} →
+                 e ecomplete →
+                 (∀{i} → (i<∥rules∥ : i < ∥ rules ∥) → (rule.branch (rules ⟦ i given i<∥rules∥ ⟧)) ecomplete) →
+                 case e of⦃· rules ·⦄ ecomplete
+      ECPF   : ∀{pf} → pf pf-complete → (PF pf) ecomplete
+      ECAsrt : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (PBE:assert e1 e2) ecomplete
 
-  data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
-    TALam  : ∀{Δ Σ' Γ x e τ1 τ2} →
-               x # Γ →
-               Δ , Σ' , (Γ ,, (x , τ1)) ⊢ e :: τ2 →
-               Δ , Σ' , Γ ⊢ ·λ x => e :: τ1 ==> τ2
-    TAFix  : ∀{Δ Σ' Γ f x e τ1 τ2} →
-               f # Γ →
-               x # Γ →
-               Δ , Σ' , (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢ e :: τ2 →
-               Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ1 ==> τ2
-    TAVar  : ∀{Δ Σ' Γ x τ} → (x , τ) ∈ Γ → Δ , Σ' , Γ ⊢ X[ x ] :: τ
-    TAApp  : ∀{Δ Σ' Γ f arg τ1 τ2} →
-               holes-disjoint f arg →
-               Δ , Σ' , Γ ⊢ f :: τ1 ==> τ2 →
-               Δ , Σ' , Γ ⊢ arg :: τ1 →
-               Δ , Σ' , Γ ⊢ f ∘ arg :: τ2
-    TATpl  : ∀{Δ Σ' Γ es τs} →
-               ∥ es ∥ == ∥ τs ∥ →
-               (∀{i j} →
-                  (i<∥es∥ : i < ∥ es ∥) →
-                  (j<∥es∥ : j < ∥ es ∥) →
-                  i ≠ j →
-                  holes-disjoint (es ⟦ i given i<∥es∥ ⟧) (es ⟦ j given j<∥es∥ ⟧)) →
-               (∀{i} →
-                  (i<∥es∥ : i < ∥ es ∥) →
-                  (i<∥τs∥ : i < ∥ τs ∥) →
-                  Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)) →
-               Δ , Σ' , Γ ⊢ ⟨ es ⟩ :: ⟨ τs ⟩
-    TAGet  : ∀{Δ Σ' Γ i e n τs} →
-               n == ∥ τs ∥ → -- this awkwardness is necessary to permit unification
-               (i<∥τs∥ : i < ∥ τs ∥) →
-               Δ , Σ' , Γ ⊢ e :: ⟨ τs ⟩ →
-               Δ , Σ' , Γ ⊢ get[ i th-of n ] e :: (τs ⟦ i given i<∥τs∥ ⟧)
-    TACtor : ∀{Δ Σ' Γ d cctx c e τ} →
-               (d , cctx) ∈ π1 Σ' →
-               (c , τ) ∈ cctx →
-               Δ , Σ' , Γ ⊢ e :: τ →
-               Δ , Σ' , Γ ⊢ C[ c ] e :: D[ d ]
-    TACase : ∀{Δ Σ' Γ d cctx e rules τ} →
-               (d , cctx) ∈ π1 Σ' →
-               Δ , Σ' , Γ ⊢ e :: D[ d ] →
-               (∀{c} →
-                  dom cctx c →
-                  -- There must be a rule for each constructor, i.e. case exhuastiveness
-                  Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
-               (∀{i ci xi ei} →
-                  (i<∥rules∥ : i < ∥ rules ∥) →
-                  |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
-                    xi # Γ ∧
-                    (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → xi ≠ rule.parm (rules ⟦ j given j<∥rules∥ ⟧)) ∧
-                    holes-disjoint ei e ∧
-                    (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → holes-disjoint ei (rule.branch (rules ⟦ j given j<∥rules∥ ⟧))) ∧
-                    -- The constructor of each rule must be of the right datatype, and the branch must type-check
-                    Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
-               Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
-    -- TODO we may have a problem with weakening
-    TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
+    -- TODO metathm relating holenamenew to completeness
+    -- TODO other metathms about completeness, holeyness
 
-  mutual
+    -- type assignment for expressions
+    data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
+      TALam  : ∀{Δ Σ' Γ x e τ1 τ2} →
+                 x # Γ →
+                 Δ , Σ' , (Γ ,, (x , τ1)) ⊢ e :: τ2 →
+                 Δ , Σ' , Γ ⊢ ·λ x => e :: τ1 ==> τ2
+      TAFix  : ∀{Δ Σ' Γ f x e τ1 τ2} →
+                 f # Γ →
+                 x # Γ →
+                 Δ , Σ' , (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢ e :: τ2 →
+                 Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ1 ==> τ2
+      TAVar  : ∀{Δ Σ' Γ x τ} → (x , τ) ∈ Γ → Δ , Σ' , Γ ⊢ X[ x ] :: τ
+      TAApp  : ∀{Δ Σ' Γ f arg τ1 τ2} →
+                 holes-disjoint f arg →
+                 Δ , Σ' , Γ ⊢ f :: τ1 ==> τ2 →
+                 Δ , Σ' , Γ ⊢ arg :: τ1 →
+                 Δ , Σ' , Γ ⊢ f ∘ arg :: τ2
+      TATpl  : ∀{Δ Σ' Γ es τs} →
+                 ∥ es ∥ == ∥ τs ∥ →
+                 (∀{i j} →
+                    (i<∥es∥ : i < ∥ es ∥) →
+                    (j<∥es∥ : j < ∥ es ∥) →
+                    i ≠ j →
+                    holes-disjoint (es ⟦ i given i<∥es∥ ⟧) (es ⟦ j given j<∥es∥ ⟧)) →
+                 (∀{i} →
+                    (i<∥es∥ : i < ∥ es ∥) →
+                    (i<∥τs∥ : i < ∥ τs ∥) →
+                    Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)) →
+                 Δ , Σ' , Γ ⊢ ⟨ es ⟩ :: ⟨ τs ⟩
+      TAGet  : ∀{Δ Σ' Γ i e n τs} →
+                 n == ∥ τs ∥ → -- this awkwardness is necessary to permit unification
+                 (i<∥τs∥ : i < ∥ τs ∥) →
+                 Δ , Σ' , Γ ⊢ e :: ⟨ τs ⟩ →
+                 Δ , Σ' , Γ ⊢ get[ i th-of n ] e :: (τs ⟦ i given i<∥τs∥ ⟧)
+      TACtor : ∀{Δ Σ' Γ d cctx c e τ} →
+                 (d , cctx) ∈ π1 Σ' →
+                 (c , τ) ∈ cctx →
+                 Δ , Σ' , Γ ⊢ e :: τ →
+                 Δ , Σ' , Γ ⊢ C[ c ] e :: D[ d ]
+      TACase : ∀{Δ Σ' Γ d cctx e rules τ} →
+                 (d , cctx) ∈ π1 Σ' →
+                 Δ , Σ' , Γ ⊢ e :: D[ d ] →
+                 (∀{c} →
+                    dom cctx c →
+                    -- There must be a rule for each constructor, i.e. case exhuastiveness
+                    Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
+                 (∀{i ci xi ei} →
+                    (i<∥rules∥ : i < ∥ rules ∥) →
+                    |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
+                      xi # Γ ∧
+                      (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → xi ≠ rule.parm (rules ⟦ j given j<∥rules∥ ⟧)) ∧
+                      holes-disjoint ei e ∧
+                      (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → holes-disjoint ei (rule.branch (rules ⟦ j given j<∥rules∥ ⟧))) ∧
+                      -- The constructor of each rule must be of the right datatype, and the branch must type-check
+                      Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
+                 Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
+      -- TODO we may have a problem with weakening
+      TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
+      TAPF   : ∀{Δ Σ' Γ pf τ} → Σ' ⊢ PF pf :· τ → Δ , Σ' , Γ ⊢ PF pf :: τ
+      TAAsrt : ∀{Δ Σ' Γ e1 e2 τ} →
+                 holes-disjoint e1 e2 →
+                 Δ , Σ' , Γ ⊢ e1 :: τ →
+                 Δ , Σ' , Γ ⊢ e2 :: τ →
+                 Δ , Σ' , Γ ⊢ PBE:assert e1 e2 :: ⟨ [] ⟩
+
     env : Set
     env = result ctx
+
+    data _env-complete : env → Set where
+      ENVC : ∀{E} → (∀{x rx} → (x , rx) ∈ E → rx rcomplete) → E env-complete
+
+    data _env-final : env → Set where
+      EF : ∀{E} → (∀{x rx} → (x , rx) ∈ E → rx final) → E env-final
+
+    data _env-values : env → Set where
+      EF : ∀{E} → (∀{x rx} → (x , rx) ∈ E → rx value) → E env-values
 
     -- results - evaluation takes expressions to results, but results aren't necessarily final
     data result : Set where
@@ -144,30 +257,47 @@ module core where
       _∘_              : result → result → result
       get[_th-of_]_    : Nat → Nat → result → result
       [_]case_of⦃·_·⦄ : env → result → List rule → result
+      PF              : pf → result
 
-  mutual
-    data _env-final : env → Set where
-      EF : (E : env) → (∀{x rx} → (x , rx) ∈ E → rx final) → E env-final
-
-    -- values are final and do not have holes,
-    -- but the env of a closure can contain results that have holes
+    -- values are final and complete (i.e. they have no holes)
     data _value : result → Set where
-      VLam : ∀{E x e} → E env-final → ([ E ]λ x => e) value
-      VFix : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ value
+      VLam : ∀{E x e} → E env-values → e ecomplete → ([ E ]λ x => e) value
+      VFix : ∀{E f x e} → E env-values → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ value
       VTpl : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) value) → ⟨ rs ⟩ value
       VCon : ∀{c r} → r value → (C[ c ] r) value
+      VPF  : ∀{pf} → pf pf-value → (PF pf) value
+
+    -- TODO proof that all values are complete
+    -- TODO proof that all non-value finals are not complete
+    -- TODO proof that all complete finals are values (cp of prev)
+    -- TODO proof that all values are final (actually necessary now)
 
     -- final results are those that cannot be evaluated further
     data _final : result → Set where
-      FVal  : ∀{r} → r value → r final
+      FLam : ∀{E x e} → E env-final → ([ E ]λ x => e) final
+      FFix : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ final
       FTpl  : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) final) → ⟨ rs ⟩ final
       FCon  : ∀{c r} → r final → (C[ c ] r) final
       FHole : ∀{E u} → E env-final → [ E ]??[ u ] final
       FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
       FGet  : ∀{i n r} → r final → (∀{rs} → r ≠ ⟨ rs ⟩) → (get[ i th-of n ] r) final
       FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → E env-final → [ E ]case r of⦃· rules ·⦄ final
+      FPF   : ∀{pf} → pf pf-final → (PF pf) final
 
-  mutual
+    data _rcomplete : result → Set where
+      RCLam  : ∀{E x e} → E env-complete → e ecomplete → ([ E ]λ x => e) rcomplete
+      RCFix  : ∀{E f x e} → E env-complete → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ rcomplete
+      RCTpl  : ∀{rs} → (∀{i} → (i<∥rs∥ : i < ∥ rs ∥) → rs ⟦ i given i<∥rs∥ ⟧ rcomplete) → ⟨ rs ⟩ rcomplete
+      RCCtor : ∀{c r} → r rcomplete → (C[ c ] r) rcomplete
+      RCAp   : ∀{r1 r2} → r1 rcomplete → r2 rcomplete → (r1 ∘ r2) rcomplete
+      RCGet  : ∀{i n r} → r rcomplete → (get[ i th-of n ] r) rcomplete
+      RCCase : ∀{E r rules} →
+                 E env-complete →
+                 r rcomplete →
+                 (∀{i} → (i<∥rules∥ : i < ∥ rules ∥) → (rule.branch (rules ⟦ i given i<∥rules∥ ⟧)) ecomplete) →
+                 [ E ]case r of⦃· rules ·⦄ rcomplete
+      RCPF   : ∀{pf} → pf pf-complete → (PF pf) rcomplete
+
     data _,_,_⊢_ : hctx → denv → tctx → env → Set where
       EnvId  : ∀{Δ Σ'} → Δ , Σ' , ∅ ⊢ ∅
       EnvInd : ∀{Δ Σ' Γ E x τx rx} →
@@ -175,6 +305,7 @@ module core where
                  Δ , Σ' ⊢ rx ·: τx →
                  Δ , Σ' , (Γ ,, (x , τx)) ⊢ (E ,, (x , rx))
 
+    -- type assignment for results
     data _,_⊢_·:_ : hctx → denv → result → typ → Set where
       TALam  : ∀{Δ Σ' Γ E x e τ} →
                  Δ , Σ' , Γ ⊢ E →
@@ -224,10 +355,16 @@ module core where
                  (u , (Γ , τ)) ∈ Δ →
                  Δ , Σ' , Γ ⊢ E →
                  Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
+      TAPF   : ∀{Δ Σ' pf τ} →
+                 Σ' ⊢ PF pf :· τ →
+                 Δ , Σ' ⊢ PF pf ·: τ
+
+  world       = env ∧ ex
+  worlds      = List world
+  constraints = List (Nat ∧ world)
 
   -- Big step evaluation
-  -- TODO : Change List ⊤ to K or List K or whatever
-  data _⊢_⇒_⊣_ : env → exp → result → List ⊤ → Set where
+  data _⊢_⇒_⊣_ : env → exp → result → constraints → Set where
     EFun             : ∀{E x e} → E ⊢ ·λ x => e ⇒ [ E ]λ x => e ⊣ []
     EFix             : ∀{E f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
     EVar             : ∀{E x r} → (x , r) ∈ E → E ⊢ X[ x ] ⇒ r ⊣ []
@@ -275,6 +412,9 @@ module core where
                          E ⊢ e ⇒ r ⊣ k →
                          (∀{j e'} → r ≠ (C[ j ] e')) →
                          E ⊢ case e of⦃· rules ·⦄ ⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
+    EAsrtPF1         : ∀{E pf e} →
+                         {!!} →
+                         E ⊢ PBE:assert pf e ⇒ ⟨ [] ⟩ ⊣ {!!}
 
 {- TODO
 

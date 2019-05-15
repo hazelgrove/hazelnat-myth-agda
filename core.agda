@@ -92,8 +92,6 @@ module core where
                     v value ∧ (∅ , Σ' ⊢ v ·: τ1) ∧ Σ' ⊢ ex :· τ2) →
                  Σ' ⊢ PF pf :· τ1 ==> τ2
 
-    -- TODO proof that if an example type-checks, it's complete
-
     record rule : Set where
       inductive
       constructor |C[_]_=>_
@@ -166,9 +164,6 @@ module core where
                  case e of⦃· rules ·⦄ ecomplete
       ECPF   : ∀{pf} → pf pf-complete → (PF pf) ecomplete
       ECAsrt : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (PBE:assert e1 e2) ecomplete
-
-    -- TODO metathm relating holenamenew to completeness
-    -- TODO other metathms about completeness, holeyness
 
     -- type assignment for expressions
     data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
@@ -266,11 +261,6 @@ module core where
       VTpl : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) value) → ⟨ rs ⟩ value
       VCon : ∀{c r} → r value → (C[ c ] r) value
       VPF  : ∀{pf} → pf pf-value → (PF pf) value
-
-    -- TODO proof that all values are complete
-    -- TODO proof that all non-value finals are not complete
-    -- TODO proof that all complete finals are values (cp of prev)
-    -- TODO proof that all values are final (actually necessary now)
 
     -- final results are those that cannot be evaluated further
     data _final : result → Set where

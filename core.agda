@@ -363,6 +363,41 @@ module core where
   worlds      = List world
   constraints = List (Nat ∧ world)
 
+  data Constraints⦃_,_⦄:=_ : result → result → constraints → Set where
+    XCEx     : ∀{E u pf} → Constraints⦃ [ E ]??[ u ] , PF pf ⦄:= ((u , E , PF pf) :: [])
+    XCExSymm : ∀{E u pf} → Constraints⦃ PF pf , [ E ]??[ u ] ⦄:= ((u , E , PF pf) :: [])
+    XCExRefl : ∀{r} → Constraints⦃ r , r ⦄:= []
+    XCTpl    : ∀{rs1 rs2 ks} →
+                 (_==_ {A = result} ⟨ rs1 ⟩ ⟨ rs2 ⟩ → ⊥) →
+                 ∥ rs1 ∥ == ∥ rs2 ∥ →
+                 ∥ rs1 ∥ == ∥ ks ∥ →
+                 (∀{i} →
+                    (i<∥rs1∥ : i < ∥ rs1 ∥) →
+                    (i<∥rs2∥ : i < ∥ rs2 ∥) →
+                    (i<∥ks∥ : i < ∥ ks ∥) →
+                    Constraints⦃ rs1 ⟦ i given i<∥rs1∥ ⟧ , rs2 ⟦ i given i<∥rs2∥ ⟧ ⦄:= (ks ⟦ i given i<∥ks∥ ⟧)) →
+                 Constraints⦃ ⟨ rs1 ⟩ , ⟨ rs2 ⟩ ⦄:= foldl _++_ [] ks
+    XCCTor   : ∀{c r1 r2 k} →
+                 (_==_ {A = result} (C[ c ] r1) (C[ c ] r2) → ⊥) →
+                 Constraints⦃ r1 , r2 ⦄:= k →
+                 Constraints⦃ C[ c ] r1 , C[ c ] r2 ⦄:= k
+    XCAp     : ∀{rf1 rarg1 rf2 rarg2 kf karg} →
+                 (_==_ {A = result} (rf1 ∘ rarg1) (rf2 ∘ rarg2) → ⊥) →
+                 Constraints⦃ rf1 , rf2 ⦄:= kf →
+                 Constraints⦃ rarg1 , rarg2 ⦄:= karg →
+                 Constraints⦃ rf1 ∘ rarg1 , rf2 ∘ rarg2 ⦄:= kf ++ karg
+    XCGet    : ∀{i n r1 r2 k} →
+                 (_==_ {A = result} (get[ i th-of n ] r1) (get[ i th-of n ] r2) → ⊥) →
+                 Constraints⦃ r1 , r2 ⦄:= k →
+                 Constraints⦃ get[ i th-of n ] r1 , get[ i th-of n ] r2 ⦄:= k
+    XCMatch  : ∀{E rules r1 r2 k} →
+                 (_==_ {A = result} [ E ]case r1 of⦃· rules ·⦄ [ E ]case r2 of⦃· rules ·⦄ → ⊥) →
+                 Constraints⦃ r1 , r2 ⦄:= k →
+                 Constraints⦃ [ E ]case r1 of⦃· rules ·⦄ , [ E ]case r2 of⦃· rules ·⦄ ⦄:= k
+
+  Constraints⦃_,_⦄:=∅ : result → result → Set
+  Constraints⦃ r1 , r2 ⦄:=∅ = Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄:= k → ⊥
+
   -- Big step evaluation
   data _⊢_⇒_⊣_ : env → exp → result → constraints → Set where
     EFun             : ∀{E x e} → E ⊢ ·λ x => e ⇒ [ E ]λ x => e ⊣ []
@@ -412,9 +447,21 @@ module core where
                          E ⊢ e ⇒ r ⊣ k →
                          (∀{j e'} → r ≠ (C[ j ] e')) →
                          E ⊢ case e of⦃· rules ·⦄ ⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
-    EAsrtPF1         : ∀{E pf e} →
-                         {!!} →
-                         E ⊢ PBE:assert pf e ⇒ ⟨ [] ⟩ ⊣ {!!}
+    EAsrt            : ∀{E e1 r1 k1 e2 r2 k2 k3} →
+                         E ⊢ e1 ⇒ r1 ⊣ k1 →
+                         E ⊢ e2 ⇒ r2 ⊣ k2 →
+                         Constraints⦃ r1 , r2 ⦄:= k3 →
+                         E ⊢ PBE:assert e1 e2 ⇒ ⟨ [] ⟩ ⊣ k1 ++ k2 ++ k3
+
+  -- This is true iff evaluation would fail due to unsatisfiable constraints
+  data _⊢_⇒∅ : env → exp → Set where
+    EFail : ∀{E e1 r1 k1 e2 r2 k2} →
+              E ⊢ e1 ⇒ r1 ⊣ k1 →
+              E ⊢ e2 ⇒ r2 ⊣ k2 →
+              Constraints⦃ r1 , r2 ⦄:=∅ →
+              E ⊢ PBE:assert e1 e2 ⇒∅
+
+  -- TODO actually use _⊢_⇒∅ when doing progress
 
 {- TODO
 

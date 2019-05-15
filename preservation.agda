@@ -43,3 +43,4 @@ module preservation where
     TACase d∈Σ' ctxcons (preservation ctxcons ta eval) h1 λ i<∥rules∥ form' →
       let p1 , p2 , _ , _ , p3 , p4 , p5 = h2 i<∥rules∥ form' in
       p1 , p2 , p3 , p4 , p5
+  preservation ctxcons (TAAsrt _ ta1 ta2) (EAsrt eval1 eval2 _) = TATpl refl λ i<∥rs∥ → abort (n≮0 i<∥rs∥)

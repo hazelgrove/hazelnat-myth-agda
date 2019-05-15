@@ -33,6 +33,38 @@ module List where
   foldl f b [] = b
   foldl f b (a :: as) = foldl f (f b a) as
 
+  -- the result of list indexing doesn't depend on the particular bounds checking proof
+  index-proof-irrelevance : {ℓ : Level} {A : Set ℓ} {l : List A} {i : Nat} {p1 p2 : i < ∥ l ∥} →
+                             l ⟦ i given p1 ⟧ == l ⟦ i given p2 ⟧
+  index-proof-irrelevance {l = []} {p1 = p1} = abort (n≮0 p1)
+  index-proof-irrelevance {l = h :: t} {Z} = refl
+  index-proof-irrelevance {l = h :: t} {1+ i} = index-proof-irrelevance {l = t}
+
+  -- if the items of two lists are equal, then the lists are equal
+  ==comm : {ℓ : Level} → {A : Set ℓ} → {l1 l2 : List A} →
+            ∥ l1 ∥ == ∥ l2 ∥ →
+            (∀{i} →
+               (i<∥l1∥ : i < ∥ l1 ∥) →
+               (i<∥l2∥ : i < ∥ l2 ∥) →
+               l1 ⟦ i given i<∥l1∥ ⟧ == l2 ⟦ i given i<∥l2∥ ⟧) →
+            l1 == l2
+  ==comm {l1 = []} {[]} ∥l1⊫=∥l2∥ items== = refl
+  ==comm {l1 = []} {h2 :: t2} () items==
+  ==comm {l1 = h1 :: t1} {[]} () items==
+  ==comm {l1 = h1 :: t1} {h2 :: t2} ∥l1⊫=∥l2∥ items== rewrite
+    items== 0<1+n 0<1+n |
+    ==comm
+      (1+inj ∥l1⊫=∥l2∥)
+      (λ {i} i<∥l1∥ i<∥l2∥ →
+         tr
+           (λ y → y == t2 ⟦ i given i<∥l2∥ ⟧)
+           (index-proof-irrelevance {l = t1} {p2 = i<∥l1∥})
+           (tr
+           (λ y → t1 ⟦ i given 1+n<1+m→n<m (n<m→1+n<1+m i<∥l1∥) ⟧ == y)                         -- ■-■¬<(ಠ_ಠv) Mother of God
+             (index-proof-irrelevance {l = t2})
+             (items== (n<m→1+n<1+m i<∥l1∥) (n<m→1+n<1+m i<∥l2∥))))
+    = refl
+
   -- _++_ theorem
   ++assc : ∀{l A a1 a2 a3} → (_++_ {l} {A} a1 a2) ++ a3 == a1 ++ (a2 ++ a3)
   ++assc {l} {A} {[]} {a2} {a3} = refl

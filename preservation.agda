@@ -16,7 +16,7 @@ module preservation where
   preservation ctxcons ta EFun = TALam ctxcons ta
   preservation ctxcons ta EFix = TAFix ctxcons ta
   preservation ctxcons (TAVar tah) (EVar h) with env-all-Γ ctxcons tah
-  ... | π3 , π4 , π5 rewrite π4 | someinj h = π5
+  ... | π3 , π4 , π5 rewrite ctxunicity h π4 = π5
   preservation ctxcons (TAHole h) EHole = TAHole h ctxcons
   preservation ctxcons (TATpl h1 h2 h3) (ETuple h4 h5 h6) =
     TATpl (! h4 · h1) λ {i} i<∥rs∥ i<∥τs∥ →

@@ -71,8 +71,8 @@ module completeness where
       where
         env-cmp : ∀{x' rx'} → (x' , rx') ∈ (Ef ,, (x , r2)) → rx' rcomplete
         env-cmp {x'} {rx'} h with ctx-split {Γ = Ef} h
-        env-cmp {x'} {rx'} h | Inl x'∈Ef = Efcmp x'∈Ef
-        env-cmp {x'} {rx'} h | Inr (x'#Ef , _ , rx'==r2) rewrite rx'==r2 =
+        env-cmp {x'} {rx'} h | Inl (_ , x'∈Ef) = Efcmp x'∈Ef
+        env-cmp {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 =
           eval-completeness Ecmp Γ⊢E ta-arg eval-arg cmp-arg
   eval-completeness Ecmp Γ⊢E (TAApp _ ta-f ta-arg) (EAppFix {Ef = Ef} {f} {x} {ef} {r2 = r2} h eval-f eval-arg eval-ef) (ECAp cmp-f cmp-arg)
     rewrite h with eval-completeness Ecmp Γ⊢E ta-f eval-f cmp-f | preservation Γ⊢E ta-f eval-f
@@ -83,12 +83,12 @@ module completeness where
         EnvInd (EnvInd Γ'⊢Ef (preservation Γ⊢E ta-f eval-f)) (preservation Γ⊢E ta-arg eval-arg)
       new-Ef-cmp  : ∀{x' rx'} → (x' , rx') ∈ (Ef ,, (f , [ Ef ]fix f ⦇·λ x => ef ·⦈)) → rx' rcomplete
       new-Ef-cmp  {x'} {rx'} h with ctx-split {Γ = Ef} h
-      new-Ef-cmp  {x'} {rx'} h | Inl x'∈Ef = Efcmp x'∈Ef
-      new-Ef-cmp  {x'} {rx'} h | Inr (x'#Ef , _ , rx'==r2) rewrite rx'==r2 = RCFix (ENVC Efcmp) efcmp
+      new-Ef-cmp  {x'} {rx'} h | Inl (_ , x'∈Ef) = Efcmp x'∈Ef
+      new-Ef-cmp  {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 = RCFix (ENVC Efcmp) efcmp
       new-Ef+-cmp : ∀{x' rx'} → (x' , rx') ∈ (Ef ,, (f , [ Ef ]fix f ⦇·λ x => ef ·⦈) ,, (x , r2)) → rx' rcomplete
       new-Ef+-cmp {x'} {rx'} h with ctx-split {Γ = Ef ,, (f , [ Ef ]fix f ⦇·λ x => ef ·⦈)} h
-      new-Ef+-cmp {x'} {rx'} h | Inl x'∈Ef+ = new-Ef-cmp x'∈Ef+
-      new-Ef+-cmp {x'} {rx'} h | Inr (x'#Ef+ , _ , rx'==r2) rewrite rx'==r2 =
+      new-Ef+-cmp {x'} {rx'} h | Inl (_ , x'∈Ef+) = new-Ef-cmp x'∈Ef+
+      new-Ef+-cmp {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 =
         eval-completeness Ecmp Γ⊢E ta-arg eval-arg cmp-arg
   eval-completeness Ecmp Γ⊢E (TAApp _ ta1 ta2) (EAppUnfinished eval1 _ _ eval2) (ECAp ecmp1 ecmp2) =
     RCAp (eval-completeness Ecmp Γ⊢E ta1 eval1 ecmp1) (eval-completeness Ecmp Γ⊢E ta2 eval2 ecmp2)
@@ -119,8 +119,8 @@ module completeness where
     where
       new-E-cmp : ∀{x' rx'} → (x' , rx') ∈ (E ,, (xj , r')) → rx' rcomplete
       new-E-cmp {x'} {rx'} x'∈E+ with ctx-split {Γ = E} x'∈E+
-      ... | Inl x'∈E = Ecmp x'∈E
-      ... | Inr (x'#E , _ , rx'==r') rewrite rx'==r'
+      ... | Inl (_ , x'∈E) = Ecmp x'∈E
+      ... | Inr (_ , rx'==r') rewrite rx'==r'
         with eval-completeness (ENVC Ecmp) Γ⊢E ta eval ecmp
       ... | RCCtor r'cmp = r'cmp
   eval-completeness Ecmp Γ⊢E (TACase _ ta _ _) (EMatchUnfinished eval _) (ECCase ecmp rulescmp) =

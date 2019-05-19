@@ -1,335 +1,425 @@
 open import Prelude
 open import Nat
+open import List
 
 module contexts where
-  -- variables are named with naturals in ė. therefore we represent
-  -- contexts as functions from names for variables (nats) to possible
-  -- bindings.
-  _ctx : Set → Set
-  A ctx = Nat → Maybe A
+  -- helper function
+  diff-1 : ∀{n m} → n < m → Nat
+  diff-1 n<m = difference (n<m→1+n≤m n<m)
 
-  -- convenient shorthand for the (unique up to fun. ext.) empty context
+  ---- the core definitions ----
+
+  _ctx : Set → Set
+  A ctx = List (Nat ∧ A)
+
+  -- nil context
   ∅ : {A : Set} → A ctx
-  ∅ _ = None
+  ∅ = []
+
+  -- singleton context
+  ■_ : {A : Set} → (Nat ∧ A) → A ctx
+  ■_ (x , a) = (x , a) :: []
 
   infixr 100 ■_
 
-  -- the domain of a context is those naturals which cuase it to emit some τ
-  dom : {A : Set} → A ctx → Nat → Set
-  dom {A} Γ x = Σ[ τ ∈ A ] (Γ x == Some τ)
-
-  -- membership, or presence, in a context
-  _∈_ : {A : Set} (p : Nat ∧ A) → (Γ : A ctx) → Set
-  (x , y) ∈ Γ = (Γ x) == Some y
-
-  -- this packages up an appeal to context memebership into a form that
-  -- lets us retain more information
-  ctxindirect : {A : Set} (Γ : A ctx) (n : Nat) → Σ[ a ∈ A ] (Γ n == Some a) ∨ Γ n == None
-  ctxindirect Γ n with Γ n
-  ctxindirect Γ n | Some x = Inl (x , refl)
-  ctxindirect Γ n | None = Inr refl
-
-  -- apartness for contexts
-  _#_ : {A : Set} (n : Nat) → (Γ : A ctx) → Set
-  x # Γ = (Γ x) == None
-
-  -- disjoint contexts are those which share no mappings
-  _##_ : {A : Set} → A ctx → A ctx → Set
-  _##_ {A} Γ Γ'  = ((n : Nat) → dom Γ n → n # Γ') ∧ ((n : Nat) → dom Γ' n → n # Γ)
-
-  -- contexts give at most one binding for each variable
-  ctxunicity : {A : Set} → {Γ : A ctx} {n : Nat} {t t' : A} →
-               (n , t) ∈ Γ →
-               (n , t') ∈ Γ →
-               t == t'
-  ctxunicity {n = n} p q with natEQ n n
-  ctxunicity p q | Inl refl = someinj (! p · q)
-  ctxunicity _ _ | Inr x≠x = abort (x≠x refl)
-
-  -- warning: this is union, but it assumes WITHOUT CHECKING that the
-  -- domains are disjoint. this is inherently asymmetric, and that's
-  -- reflected throughout the development that follows
-  _∪_ : {A : Set} → A ctx → A ctx → A ctx
-  (C1 ∪ C2) x with C1 x
-  (C1 ∪ C2) x | Some x₁ = Some x₁
-  (C1 ∪ C2) x | None = C2 x
-
-  -- the singleton context
-  ■_ : {A : Set} → (Nat ∧ A) → A ctx
-  (■ (x , a)) y with natEQ x y
-  (■ (x , a)) .x | Inl refl = Some a
-  ... | Inr _ = None
-
-  -- context extension
-  _,,_ : {A : Set} → A ctx → (Nat ∧ A) → A ctx
-  (Γ ,, (x , t)) = Γ ∪ (■ (x , t))
+  -- context extension/insertion - never use _::_
+  _,,_ : ∀{A} → A ctx → (Nat ∧ A) → A ctx
+  [] ,, (x , a) = ■ (x , a)
+  ((hx , ha) :: t) ,, (x , a) with <dec x hx
+  ... | Inl x<hx       = (x , a) :: ((diff-1 x<hx , ha) :: t)
+  ... | Inr (Inl refl) = (x , a) :: t
+  ... | Inr (Inr hx<x) = (hx , ha) :: (t ,, (diff-1 hx<x , a))
 
   infixl 10 _,,_
 
-  -- used below in proof of ∪ commutativity and associativity
-  lem-dom-union1 : {A : Set} {C1 C2 : A ctx} {x : Nat} →
-                                    C1 ## C2 →
-                                    dom C1 x →
-                                    (C1 ∪ C2) x == C1 x
-  lem-dom-union1 {A} {C1} {C2} {x} (d1 , d2) D with C1 x
-  lem-dom-union1 (d1 , d2) D | Some x₁ = refl
-  lem-dom-union1 (d1 , d2) D | None = abort (somenotnone (! (π2 D)))
+  -- membership, or presence, in a context
+  data _∈_ : {A : Set} (p : Nat ∧ A) → (Γ : A ctx) → Set where
+    InH : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
+           (x , a) ∈ ((x , a) :: Γ)
+    InT : {A : Set} {Γ : A ctx} {x s : Nat} {a a' : A} →
+           (x , a) ∈ Γ →
+           ((x + 1+ s , a)) ∈ ((s , a') :: Γ)
 
-  lem-dom-union2 : {A : Set} {C1 C2 : A ctx} {x : Nat} →
-                                    C1 ## C2 →
-                                    dom C1 x →
-                                    (C2 ∪ C1) x == C1 x
-  lem-dom-union2 {A} {C1} {C2} {x} (d1 , d2) D with ctxindirect C2 x
-  lem-dom-union2 {A} {C1} {C2} {x} (d1 , d2) D | Inl x₁ = abort (somenotnone (! (π2 x₁) · d1 x D ))
-  lem-dom-union2 {A} {C1} {C2} {x} (d1 , d2) D | Inr x₁ with C2 x
-  lem-dom-union2 (d1 , d2) D | Inr x₂ | Some x₁ = abort (somenotnone x₂)
-  lem-dom-union2 (d1 , d2) D | Inr x₁ | None = refl
+  -- the domain of a context
+  dom : {A : Set} → A ctx → Nat → Set
+  dom {A} Γ x = Σ[ a ∈ A ] ((x , a) ∈ Γ)
 
-  lem-apart-union1 : {A : Set} (C1 C2 : A ctx) (x : Nat) → x # C1 → x # C2 → x # (C1 ∪ C2)
-  lem-apart-union1 C1 C2 x apt1 apt2 with C1 x
-  lem-apart-union1 C1 C2 x apt1 apt2 | Some x₁ = abort (somenotnone apt1)
-  lem-apart-union1 C1 C2 x apt1 apt2 | None = apt2
+  -- apartness for contexts
+  _#_ : {A : Set} (n : Nat) → (Γ : A ctx) → Set
+  x # Γ = dom Γ x → ⊥
 
-  lem-apart-union2 : {A : Set} (C1 C2 : A ctx) (x : Nat) → x # C1 → x # C2 → x # (C2 ∪ C1)
-  lem-apart-union2 C1 C2 x apt1 apt2 with C2 x
-  lem-apart-union2 C1 C2 x apt1 apt2 | Some x₁ = abort (somenotnone apt2)
-  lem-apart-union2 C1 C2 x apt1 apt2 | None = apt1
+  -- The primary way to test membership is to use _∈_,
+  -- but this can be used in cases where using _∈_
+  -- would be too verbose or awkward.
+  -- The lookup theorems prove that they are compatible
+  _⟦_⟧ : {A : Set} → A ctx → Nat → Maybe A
+  [] ⟦ x ⟧ = None
+  ((hx , ha) :: t) ⟦ x ⟧ with <dec x hx
+  ... | Inl x<hx       = None
+  ... | Inr (Inl refl) = Some ha
+  ... | Inr (Inr hx<x) = t ⟦ diff-1 hx<x ⟧
 
-  -- if the contexts in question are disjoint, then union is commutative
-  ∪comm : {A : Set} → (C1 C2 : A ctx) → C1 ## C2 → (C1 ∪ C2) == (C2 ∪ C1)
-  ∪comm C1 C2 (d1 , d2)= funext guts
+  ---- lemmas ----
+
+  undiff-1 : (x s : Nat) → (x<s+1+x : x < s + 1+ x) → s == diff-1 x<s+1+x
+  undiff-1 x s x<s+1+x
+    rewrite n+1+m==1+n+m {s} {x} | ! (m-n==1+m-1+n n≤m+n (n<m→1+n≤m x<s+1+x)) | +comm {s} {x}
+      = ! (n+m-n==m {x} {s})
+
+  too-small : {A : Set} {Γ : A ctx} {xl xb : Nat} {a : A} →
+               xl < xb →
+               dom ((xb , a) :: Γ) xl →
+               ⊥
+  too-small (_ , ne) (_ , InH) = ne refl
+  too-small (x+1+xb≤xb , x+1+xb==xb) (_ , InT _) =
+    x+1+xb==xb (≤antisym x+1+xb≤xb (≤trans (≤1+ ≤refl) n≤m+n))
+
+  all-not-none : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
+                  None ≠ (((x , a) :: Γ) ⟦ x ⟧)
+  all-not-none {x = x} rewrite <dec-refl x = λ ()
+
+  all-bindings-==-rec-eq : {A : Set} {Γ1 Γ2 : A ctx} {x : Nat} {a : A} →
+                            ((x' : Nat) → ((x , a) :: Γ1) ⟦ x' ⟧ == ((x , a) :: Γ2) ⟦ x' ⟧) →
+                            ((x' : Nat) → Γ1 ⟦ x' ⟧ == Γ2 ⟦ x' ⟧)
+  all-bindings-==-rec-eq {x = x} h x'
+    with h (x' + 1+ x)
+  ... | eq
+    with <dec (x' + 1+ x) x
+  ... | Inl x'+1+x<x
+          = abort (<antisym x'+1+x<x (n<m→n<s+m n<1+n))
+  ... | Inr (Inl x'+1+x==x)
+          = abort ((flip n≠n+1+m) (n+1+m==1+n+m · (+comm {1+ x} · x'+1+x==x)))
+  ... | Inr (Inr x<x'+1+x)
+          rewrite ! (undiff-1 x x' x<x'+1+x) = eq
+
+  all-bindings-==-rec : {A : Set} {Γ1 Γ2 : A ctx} {x1 x2 : Nat} {a1 a2 : A} →
+                         ((x : Nat) → ((x1 , a1) :: Γ1) ⟦ x ⟧ == ((x2 , a2) :: Γ2) ⟦ x ⟧) →
+                         ((x : Nat) → Γ1 ⟦ x ⟧ == Γ2 ⟦ x ⟧)
+  all-bindings-==-rec {x1 = x1} {x2} h x
+    with h x1 | h x2
+  ... | eq1 | eq2
+    rewrite <dec-refl x1 | <dec-refl x2
+    with <dec x1 x2 | <dec x2 x1
+  ... | Inl _ | _
+          = abort (somenotnone eq1)
+  ... | Inr _ | Inl _
+          = abort (somenotnone (! eq2))
+  ... | Inr (Inl refl) | Inr (Inl refl)
+          rewrite someinj eq1 | someinj eq2
+            = all-bindings-==-rec-eq h x
+  ... | Inr (Inl refl) | Inr (Inr x2<x2)
+          = abort (<antirefl x2<x2)
+  ... | Inr (Inr x2<x2) | Inr (Inl refl)
+          = abort (<antirefl x2<x2)
+  ... | Inr (Inr x2<x1) | Inr (Inr x1<x2)
+          = abort (<antisym x1<x2 x2<x1)
+
+  ---- core theorems ----
+
+  -- lookup is decidable
+  lookup-dec : {A : Set} (Γ : A ctx) (x : Nat) →
+                Σ[ a ∈ A ] (Γ ⟦ x ⟧ == Some a) ∨ Γ ⟦ x ⟧ == None
+  lookup-dec Γ x
+    with Γ ⟦ x ⟧
+  ... | Some a = Inl (a , refl)
+  ... | None   = Inr refl
+
+  -- The next two theorems show that lookup (_⟦_⟧) is consistent with membership (_∈_)
+  lookup-cons-1 : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
+                   Γ ⟦ x ⟧ == Some a →
+                   (x , a) ∈ Γ
+  lookup-cons-1 {Γ = []} ()
+  lookup-cons-1 {Γ = (hx , ha) :: t} {x} h
+    with <dec x hx
+  lookup-cons-1 {_} {(hx , ha) :: t} {x} ()        | Inl _
+  lookup-cons-1 {_} {(hx , ha) :: t} {.hx} refl    | Inr (Inl refl) = InH
+  lookup-cons-1 {_} {(hx , ha) :: t} {x} {a = a} h | Inr (Inr hx<x)
+    = tr
+        (λ y → (y , a) ∈ ((hx , ha) :: t))
+        (m-n+n==m (n<m→1+n≤m hx<x))
+        (InT (lookup-cons-1 {Γ = t} h))
+
+  lookup-cons-2 : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
+                   (x , a) ∈ Γ →
+                   Γ ⟦ x ⟧ == Some a
+  lookup-cons-2 {x = x} InH rewrite <dec-refl x = refl
+  lookup-cons-2 (InT {Γ = Γ} {x = x} {s} {a} x∈Γ)
+    with <dec (x + 1+ s) s
+  ... | Inl x+1+s<s        = abort (<antisym x+1+s<s (n<m→n<s+m n<1+n))
+  ... | Inr (Inl x+1+s==s) = abort ((flip n≠n+1+m) (n+1+m==1+n+m · (+comm {1+ s} · x+1+s==s)))
+  ... | Inr (Inr s<x+1+s)
+    with lookup-cons-2 x∈Γ
+  ... | h rewrite ! (undiff-1 s x s<x+1+s) = h
+
+  -- membership (_∈_) respects insertion (_,,_)
+  x,a∈Γ,,x,a : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
+                (x , a) ∈ (Γ ,, (x , a))
+  x,a∈Γ,,x,a {Γ = []} {x} {a} = InH
+  x,a∈Γ,,x,a {_} {(hx , ha) :: t} {x} {a}
+    with <dec x hx
+  ... | Inl _          = InH
+  ... | Inr (Inl refl) = InH
+  ... | Inr (Inr hx<x) =
+          tr
+            (λ y → (y , a) ∈ ((hx , ha) :: (t ,, (diff-1 hx<x , a))))
+            (m-n+n==m (n<m→1+n≤m hx<x))
+            (InT (x,a∈Γ,,x,a {Γ = t} {diff-1 hx<x} {a}))
+
+  -- insertion can't generate spurious membership
+  x∈Γ+→x∈Γ : {A : Set} {Γ : A ctx} {x x' : Nat} {a a' : A} →
+                x ≠ x' →
+                (x , a) ∈ (Γ ,, (x' , a')) →
+                (x , a) ∈ Γ
+  x∈Γ+→x∈Γ {Γ = []} x≠x' InH = abort (x≠x' refl)
+  x∈Γ+→x∈Γ {Γ = []} x≠x' (InT ())
+  x∈Γ+→x∈Γ {Γ = (hx , ha) :: t} {x' = x'} x≠x' x∈Γ+
+    with <dec x' hx
+  x∈Γ+→x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' InH | Inl x'<hx = abort (x≠x' refl)
+  x∈Γ+→x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT InH) | Inl x'<hx
+    rewrite m-n+n==m (n<m→1+n≤m x'<hx) = InH
+  x∈Γ+→x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT (InT {x = x} x∈Γ+)) | Inl x'<hx
+    rewrite +assc {x} {1+ (diff-1 x'<hx)} {1+ x'} | m-n+n==m (n<m→1+n≤m x'<hx)
+      = InT x∈Γ+
+  x∈Γ+→x∈Γ {_} {(hx , ha) :: t} {x' = .hx} x≠x' InH | Inr (Inl refl) = abort (x≠x' refl)
+  x∈Γ+→x∈Γ {_} {(hx , ha) :: t} {x' = .hx} x≠x' (InT x∈Γ+) | Inr (Inl refl) = InT x∈Γ+
+  x∈Γ+→x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' InH | Inr (Inr hx<x') = InH
+  x∈Γ+→x∈Γ {_} {(hx , ha) :: t} {x' = x'} x≠x' (InT x∈Γ+) | Inr (Inr hx<x')
+    = InT (x∈Γ+→x∈Γ (λ where refl → x≠x' (m-n+n==m (n<m→1+n≤m hx<x'))) x∈Γ+)
+
+  -- insertion respects membership
+  x∈Γ→x∈Γ+ : {A : Set} {Γ : A ctx} {x x' : Nat} {a a' : A} →
+                x ≠ x' →
+                (x , a) ∈ Γ →
+                (x , a) ∈ (Γ ,, (x' , a'))
+  x∈Γ→x∈Γ+ {x = x} {x'} {a} {a'} x≠x' (InH {Γ = Γ'})
+    with <dec x' x
+  ... | Inl x'<x
+          = tr
+              (λ y → (y , a) ∈ ((x' , a') :: ((diff-1 x'<x , a) :: Γ')))
+              (m-n+n==m (n<m→1+n≤m x'<x))
+              (InT InH)
+  ... | Inr (Inl refl) = abort (x≠x' refl)
+  ... | Inr (Inr x<x') = InH
+  x∈Γ→x∈Γ+ {x = .(_ + 1+ _)} {x'} {a} {a'} x≠x' (InT {Γ = Γ} {x} {s} {a' = a''} x∈Γ)
+    with <dec x' s
+  ... | Inl x'<s
+          = tr
+              (λ y → (y , a) ∈ ((x' , a') :: ((diff-1 x'<s , a'') :: Γ)))
+              ((+assc {b = 1+ (diff-1 x'<s)}) · (ap1 (_+_ x) (1+ap (m-n+n==m (n<m→1+n≤m x'<s)))))
+              (InT (InT x∈Γ))
+  ... | Inr (Inl refl) = InT x∈Γ
+  ... | Inr (Inr s<x') =
+          InT (x∈Γ→x∈Γ+ (λ where refl → x≠x' (m-n+n==m (n<m→1+n≤m s<x'))) x∈Γ)
+
+  -- Decidability of membership
+  -- This also packages up an appeal to context membership into a form that
+  -- lets us retain more information
+  ctxindirect : {A : Set} (Γ : A ctx) (x : Nat) → dom Γ x ∨ x # Γ
+  ctxindirect [] x = Inr (λ ())
+  ctxindirect ((hx , ha) :: t) x
+    with <dec x hx
+  ... | Inl x<hx       = Inr (too-small x<hx)
+  ... | Inr (Inl refl) = Inl (ha , InH)
+  ... | Inr (Inr hx<x)
+    with ctxindirect t (diff-1 hx<x)
+  ctxindirect ((hx , ha) :: t) x | Inr (Inr hx<x) | Inl (a , rec) =
+    Inl (a , tr
+               (λ y → (y , a) ∈ ((hx , ha) :: t))
+               (m-n+n==m (n<m→1+n≤m hx<x))
+               (InT rec))
+  ctxindirect {A} ((hx , ha) :: t) x | Inr (Inr hx<x) | Inr dne =
+    Inr x∉Γ
     where
-      guts : (x : Nat) → (C1 ∪ C2) x == (C2 ∪ C1) x
-      guts x with ctxindirect C1 x | ctxindirect C2 x
-      guts x | Inl (π1 , π2) | Inl (π3 , π4) = abort (somenotnone (! π4 · d1 x (π1 , π2)))
-      guts x | Inl x₁ | Inr x₂ = tr (λ qq → qq == (C2 ∪ C1) x) (! (lem-dom-union1 (d1 , d2) x₁)) (tr (λ qq → C1 x == qq) (! (lem-dom-union2 (d1 , d2) x₁)) refl)
-      guts x | Inr x₁ | Inl x₂ = tr (λ qq → (C1 ∪ C2) x == qq) (! (lem-dom-union1 (d2 , d1) x₂)) (tr (λ qq → qq == C2 x) (! (lem-dom-union2 (d2 , d1) x₂)) refl)
-      guts x | Inr x₁ | Inr x₂ = tr (λ qq → qq == (C2 ∪ C1) x) (! (lem-apart-union1 C1 C2 x x₁ x₂)) (tr (λ qq → None == qq) (! (lem-apart-union2 C1 C2 x x₁ x₂)) refl)
+      x∉Γ : Σ[ a ∈ A ] ((x , a) ∈ ((hx , ha) :: t)) → ⊥
+      x∉Γ (_ , x∈Γ) with x∈Γ
+      ... | InH = (π2 hx<x) refl
+      ... | InT {x = s} x-hx-1∈t
+        rewrite ! (undiff-1 hx s hx<x) = dne (_ , x-hx-1∈t)
 
+  -- contexts give at most one binding for each variable
+  ctxunicity : {A : Set} {Γ : A ctx} {x : Nat} {a a' : A} →
+                 (x , a) ∈ Γ →
+                 (x , a') ∈ Γ →
+                 a == a'
+  ctxunicity ah a'h
+    with lookup-cons-2 ah | lookup-cons-2 a'h
+  ... | ah' | a'h' = someinj (! ah' · a'h')
 
-  -- an element in the left of a union is in the union
-  x∈∪l : {A : Set} → (Γ Γ' : A ctx) (n : Nat) (x : A) → (n , x) ∈ Γ → (n , x) ∈ (Γ ∪ Γ')
-  x∈∪l Γ Γ' n x xin with Γ n
-  x∈∪l Γ Γ' n x₁ xin | Some x = xin
-  x∈∪l Γ Γ' n x ()   | None
-
-  -- an element in the right of a union is in the union as long as the
-  -- contexts are disjoint; this asymmetry reflects the asymmetry in the
-  -- definition of union
-  x∈∪r : {A : Set} → (Γ Γ' : A ctx) (n : Nat) (x : A) →
-                             (n , x) ∈ Γ' →
-                             Γ' ## Γ →
-                             (n , x) ∈ (Γ ∪ Γ')
-  x∈∪r Γ Γ' n x nx∈ disj = tr (λ qq → (n , x) ∈ qq) (∪comm _ _ disj) (x∈∪l Γ' Γ n x nx∈)
-
-  -- an element is in the context formed with just itself
-  x∈■ : {A : Set} (n : Nat) (a : A) → (n , a) ∈ (■ (n , a))
-  x∈■ n a with natEQ n n
-  x∈■ n a | Inl refl = refl
-  x∈■ n a | Inr x = abort (x refl)
+  -- everything is apart from the nil context
+  x#∅ : {A : Set} {x : Nat} → _#_ {A} x ∅
+  x#∅ (_ , ())
 
   -- if an index is in the domain of a singleton context, it's the only
   -- index in the context
-  lem-dom-eq : {A : Set} {y : A} {n m : Nat} →
-                                 dom (■ (m , y)) n →
-                                 n == m
-  lem-dom-eq {n = n} {m = m} (π1 , π2) with natEQ m n
-  lem-dom-eq (π1 , π2) | Inl refl = refl
-  lem-dom-eq (π1 , π2) | Inr x = abort (somenotnone (! π2))
+  lem-dom-eq : {A : Set} {a : A} {n m : Nat} →
+                 dom (■ (m , a)) n →
+                 n == m
+  lem-dom-eq (_ , InH) = refl
+  lem-dom-eq (_ , InT ())
+
+  -- If two contexts are semantically equivalent
+  -- (i.e. they represent the same mapping from ids to values),
+  -- then they are physically equal as judged by _==_
+  ctx-==-eqv : {A : Set} {Γ1 Γ2 : A ctx} →
+                ((x : Nat) → Γ1 ⟦ x ⟧ == Γ2 ⟦ x ⟧) →
+                Γ1 == Γ2
+  ctx-==-eqv {Γ1 = []} {[]} all-bindings-== = refl
+  ctx-==-eqv {Γ1 = []} {(hx2 , ha2) :: t2} all-bindings-==
+    = abort (all-not-none {Γ = t2} {x = hx2} (all-bindings-== hx2))
+  ctx-==-eqv {Γ1 = (hx1 , ha1) :: t1} {[]} all-bindings-==
+    = abort (all-not-none {Γ = t1} {x = hx1} (! (all-bindings-== hx1)))
+  ctx-==-eqv {Γ1 = (hx1 , ha1) :: t1} {(hx2 , ha2) :: t2} all-bindings-==
+    rewrite ctx-==-eqv {Γ1 = t1} {t2} (all-bindings-==-rec all-bindings-==)
+    with all-bindings-== hx1 | all-bindings-== hx2
+  ... | ha1== | ha2== rewrite <dec-refl hx1 | <dec-refl hx2
+    with <dec hx1 hx2 | <dec hx2 hx1
+  ... | Inl hx1<hx2 | _
+          = abort (somenotnone ha1==)
+  ... | Inr (Inl refl) | Inl hx2<hx1
+          = abort (somenotnone (! ha2==))
+  ... | Inr (Inr hx2<hx1) | Inl hx2<'hx1
+          = abort (somenotnone (! ha2==))
+  ... | Inr (Inl refl) | Inr _
+          rewrite someinj ha1== = refl
+  ... | Inr (Inr hx2<hx1) | Inr (Inl refl)
+          rewrite someinj ha2== = refl
+  ... | Inr (Inr hx2<hx1) | Inr (Inr hx1<hx2)
+          = abort (<antisym hx1<hx2 hx2<hx1)
+
+  -- equality of contexts is decidable
+  ctx-==-dec : {A : Set} {Γ1 Γ2 : A ctx} →
+                ({a1 a2 : A} → a1 == a2 ∨ (a1 == a2 → ⊥)) →
+                Γ1 == Γ2 ∨ (Γ1 == Γ2 → ⊥)
+  ctx-==-dec {Γ1 = []} {[]} _ = Inl refl
+  ctx-==-dec {Γ1 = []} {x :: Γ2} _ = Inr (λ ())
+  ctx-==-dec {Γ1 = x :: Γ1} {[]} _ = Inr (λ ())
+  ctx-==-dec {Γ1 = (hx1 , ha1) :: t1} {(hx2 , ha2) :: t2} A==dec
+    with natEQ hx1 hx2 | A==dec {ha1} {ha2} | ctx-==-dec {Γ1 = t1} {t2} A==dec
+  ... | Inl refl | Inl refl | Inl refl = Inl refl
+  ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
+  ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
+  ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
+
+  -- A useful way to destruct contexts. Never destruct a context via _::_
+  ctx-split : {A : Set} {Γ : A ctx} {n m : Nat} {an am : A} →
+                (n , an) ∈ (Γ ,, (m , am)) →
+                (n ≠ m ∧ (n , an) ∈ Γ) ∨ (n == m ∧ an == am)
+  ctx-split {Γ = Γ} {n} {m} {an} {am} n∈Γ+
+    with natEQ n m
+  ... | Inl refl = Inr (refl , ctxunicity n∈Γ+ (x,a∈Γ,,x,a {Γ = Γ}))
+  ... | Inr n≠m  = Inl (n≠m , x∈Γ+→x∈Γ n≠m n∈Γ+)
+
+  ---- contrapositives of some previous theorems ----
 
   lem-neq-apart : {A : Set} {a : A} {n m : Nat} →
-                   n ≠ m →
-                   n # (■ (m , a))
-  lem-neq-apart {a = a} {n} {m} ne with ctxindirect (■ (m , a)) n
-  ... | Inl dom = abort (ne (lem-dom-eq dom))
-  ... | Inr # = #
+                    n ≠ m →
+                    n # (■ (m , a))
+  lem-neq-apart n≠m h = n≠m (lem-dom-eq h)
 
-  -- a singleton context formed with an index apart from a context is
-  -- disjoint from that context
-  lem-apart-sing-disj : {A : Set} {n : Nat} {a : A} {Γ : A ctx} →
-                                     n # Γ →
-                                     (■ (n , a)) ## Γ
-  lem-apart-sing-disj {A} {n} {a} {Γ} apt = asd1 , asd2
-    where
-      asd1 : (n₁ : Nat) → dom (■ (n , a)) n₁ → n₁ # Γ
-      asd1 m d with lem-dom-eq  d
-      asd1 .n d | refl = apt
+  x#Γ→x#Γ+ : {A : Set} {Γ : A ctx} {x x' : Nat} {a' : A} →
+               x ≠ x' →
+               x # Γ →
+               x # (Γ ,, (x' , a'))
+  x#Γ→x#Γ+ {Γ = Γ} {x} {x'} {a'} x≠x' x#Γ
+    with ctxindirect (Γ ,, (x' , a')) x
+  ... | Inl (_ , x∈Γ+) = abort (x#Γ (_ , x∈Γ+→x∈Γ x≠x' x∈Γ+))
+  ... | Inr x#Γ+       = x#Γ+
 
-      asd2 : (n₁ : Nat) → dom Γ n₁ → n₁ # (■ (n , a))
-      asd2 m (π1 , π2) with natEQ n m
-      asd2 .n (π1 , π2) | Inl refl = abort (somenotnone (! π2 · apt ))
-      asd2 m (π1 , π2) | Inr x = refl
+  x#Γ+→x#Γ : {A : Set} {Γ : A ctx} {x x' : Nat} {a' : A} →
+               x # (Γ ,, (x' , a')) →
+               x # Γ
+  x#Γ+→x#Γ {Γ = Γ} {x} {x'} {a'} x#Γ+
+    with ctxindirect Γ x
+  ... | Inr x#Γ       = x#Γ
+  ... | Inl (_ , x∈Γ)
+    with natEQ x x'
+  ... | Inl refl = abort (x#Γ+ (_ , x,a∈Γ,,x,a {Γ = Γ}))
+  ... | Inr x≠x' = abort (x#Γ+ (_ , x∈Γ→x∈Γ+ x≠x' x∈Γ))
 
-  -- the only index of a singleton context is in its domain
-  lem-domsingle : {A : Set} (p : Nat) (q : A) → dom (■ (p , q)) p
-  lem-domsingle p q with natEQ p p
-  lem-domsingle p q | Inl refl = q , refl
-  lem-domsingle p q | Inr x₁ = abort (x₁ refl)
+  lookup-cp-1 : {A : Set} {Γ : A ctx} {x : Nat} →
+                 x # Γ →
+                 Γ ⟦ x ⟧ == None
+  lookup-cp-1 {Γ = Γ} {x} x#Γ
+    with lookup-dec Γ x
+  ... | Inl (_ , x∈Γ) = abort (x#Γ (_ , (lookup-cons-1 x∈Γ)))
+  ... | Inr x#'Γ      = x#'Γ
 
+  lookup-cp-2 : {A : Set} {Γ : A ctx} {x : Nat} →
+                 Γ ⟦ x ⟧ == None →
+                 x # Γ
+  lookup-cp-2 {Γ = Γ} {x} x#Γ
+    with ctxindirect Γ x
+  ... | Inl (_ , x∈Γ) = abort (somenotnone ((! (lookup-cons-2 x∈Γ)) · x#Γ))
+  ... | Inr x#'Γ      = x#'Γ
 
-  -- dual of above
-  lem-disj-sing-apart : {A : Set} {n : Nat} {a : A} {Γ : A ctx} →
-                                     (■ (n , a)) ## Γ →
-                                     n # Γ
-  lem-disj-sing-apart {A} {n} {a} {Γ} (d1 , d2) = d1 n (lem-domsingle n a)
+  ---- contraction and exchange ----
 
-  -- the singleton context can only produce one non-none result
-  lem-insingeq : {A : Set} {x x' : Nat} {τ τ' : A} →
-                              (■ (x , τ)) x' == Some τ' →
-                              τ == τ'
-  lem-insingeq {A} {x} {x'} {τ} {τ'} eq with lem-dom-eq (τ' , eq)
-  lem-insingeq {A} {x} {.x} {τ} {τ'} eq | refl with natEQ x x
-  lem-insingeq refl | refl | Inl refl = refl
-  lem-insingeq eq | refl | Inr x₁ = abort (somenotnone (! eq))
+  -- TODO these proofs could use refactoring -
+  -- contraction should probably make use of ctx-==-dec and
+  -- exchange is way too long and repetitive
 
-  -- if an index doesn't appear in a context, and the union of that context
-  -- with a singleton does produce a result, it must have come from the singleton
-  lem-apart-union-eq : {A : Set} {Γ : A ctx} {x x' : Nat} {τ τ' : A} →
-                                    x' # Γ →
-                                    (Γ ∪ ■ (x , τ)) x' == Some τ' →
-                                    τ == τ'
-  lem-apart-union-eq {A} {Γ} {x} {x'} {τ} {τ'} apart eq with Γ x'
-  lem-apart-union-eq apart eq | Some x = abort (somenotnone apart)
-  lem-apart-union-eq apart eq | None = lem-insingeq eq
+  contraction : {A : Set} {Γ : A ctx} {x : Nat} {a a' : A} →
+                 Γ ,, (x , a') ,, (x , a) == Γ ,, (x , a)
+  contraction {Γ = []} {x} rewrite <dec-refl x = refl
+  contraction {Γ = (hx , ha) :: t} {x} {a} {a'}
+    with <dec x hx
+  ... | Inl _          rewrite <dec-refl x  = refl
+  ... | Inr (Inl refl) rewrite <dec-refl hx = refl
+  ... | Inr (Inr hx<x)
+    with <dec x hx
+  ... | Inl x<hx        = abort (<antisym x<hx hx<x)
+  ... | Inr (Inl refl)  = abort (<antirefl hx<x)
+  ... | Inr (Inr hx<'x)
+    rewrite diff-proof-irrelevance (n<m→1+n≤m hx<x) (n<m→1+n≤m hx<'x)
+          | contraction {Γ = t} {diff-1 hx<'x} {a} {a'}
+    = refl
 
-  -- if an index not in a singleton context produces a result from that
-  -- singleton unioned with another context, the result must have come from
-  -- the other context
-  lem-neq-union-eq : {A : Set} {Γ : A ctx} {x x' : Nat} {τ τ' : A} →
-                                    x' ≠ x →
-                                    (Γ ∪ ■ (x , τ)) x' == Some τ' →
-                                    Γ x' == Some τ'
-  lem-neq-union-eq {A} {Γ} {x} {x'} {τ} {τ'} neq eq with Γ x'
-  lem-neq-union-eq neq eq | Some x = eq
-  lem-neq-union-eq {A} {Γ} {x} {x'} {τ} {τ'} neq eq | None with natEQ x x'
-  lem-neq-union-eq neq eq | None | Inl x₁ = abort ((flip neq) x₁)
-  lem-neq-union-eq neq eq | None | Inr x₁ = abort (somenotnone (! eq))
-
-  -- extending a context with a new index produces the result paired with
-  -- that index.
-  ctx-top : {A : Set} → (Γ : A ctx) (n : Nat) (a : A) →
-                                       (n # Γ) →
-                                       (n , a) ∈ (Γ ,, (n , a))
-  ctx-top Γ n a apt = x∈∪r Γ (■ (n , a)) n a (x∈■ n a) (lem-apart-sing-disj apt)
-
-  -- if a union of a singleton and a ctx produces no result, the argument
-  -- index must be apart from the ctx and disequal to the index of the
-  -- singleton
-  lem-union-none : {A : Set} {Γ : A ctx} {a : A} {x x' : Nat}
-                      → (Γ ∪ ■ (x , a)) x' == None
-                      → (x ≠ x') ∧ (x' # Γ)
-  lem-union-none {A} {Γ} {a} {x} {x'} emp with ctxindirect Γ x'
-  lem-union-none {A} {Γ} {a} {x} {x'} emp | Inl (π1 , π2) with Γ x'
-  lem-union-none emp | Inl (π1 , π2) | Some x = abort (somenotnone emp)
-  lem-union-none {A} {Γ} {a} {x} {x'} emp | Inl (π1 , π2) | None with natEQ x x'
-  lem-union-none emp | Inl (π1 , π2) | None | Inl x₁ = abort (somenotnone (! π2))
-  lem-union-none emp | Inl (π1 , π2) | None | Inr x₁ = x₁ , refl
-  lem-union-none {A} {Γ} {a} {x} {x'} emp | Inr y with Γ x'
-  lem-union-none emp | Inr y | Some x = abort (somenotnone emp)
-  lem-union-none {A} {Γ} {a} {x} {x'} emp | Inr y | None with natEQ x x'
-  lem-union-none emp | Inr y | None | Inl refl = abort (somenotnone emp)
-  lem-union-none emp | Inr y | None | Inr x₁ = x₁ , refl
-
-
-  --- lemmas building up to a proof of associativity of ∪
-  ctxignore1 : {A : Set} (x : Nat) (C1 C2 : A ctx) → x # C1 → (C1 ∪ C2) x == C2 x
-  ctxignore1 x C1 C2 apt with ctxindirect C1 x
-  ctxignore1 x C1 C2 apt | Inl x₁ = abort (somenotnone (! (π2 x₁) · apt))
-  ctxignore1 x C1 C2 apt | Inr x₁ with C1 x
-  ctxignore1 x C1 C2 apt | Inr x₂ | Some x₁ = abort (somenotnone (x₂))
-  ctxignore1 x C1 C2 apt | Inr x₁ | None = refl
-
-  ctxignore2 : {A : Set} (x : Nat) (C1 C2 : A ctx) → x # C2 → (C1 ∪ C2) x == C1 x
-  ctxignore2 x C1 C2 apt with ctxindirect C2 x
-  ctxignore2 x C1 C2 apt | Inl x₁ = abort (somenotnone (! (π2 x₁) · apt))
-  ctxignore2 x C1 C2 apt | Inr x₁ with C1 x
-  ctxignore2 x C1 C2 apt | Inr x₂ | Some x₁ = refl
-  ctxignore2 x C1 C2 apt | Inr x₁ | None = x₁
-
-  ctxcollapse1 : {A : Set} → (C1 C2 C3 : A ctx) (x : Nat) →
-               (x # C3) →
-               (C2 ∪ C3) x == C2 x →
-               (C1 ∪ (C2 ∪ C3)) x == (C1 ∪ C2) x
-  ctxcollapse1 C1 C2 C3 x apt eq with C2 x
-  ctxcollapse1 C1 C2 C3 x apt eq | Some x₁ with C1 x
-  ctxcollapse1 C1 C2 C3 x apt eq | Some x₂ | Some x₁ = refl
-  ctxcollapse1 C1 C2 C3 x apt eq | Some x₁ | None with C2 x
-  ctxcollapse1 C1 C2 C3 x apt eq | Some x₂ | None | Some x₁ = refl
-  ctxcollapse1 C1 C2 C3 x apt eq | Some x₁ | None | None = apt
-  ctxcollapse1 C1 C2 C3 x apt eq | None with C1 x
-  ctxcollapse1 C1 C2 C3 x apt eq | None | Some x₁ = refl
-  ctxcollapse1 C1 C2 C3 x apt eq | None | None with C2 x
-  ctxcollapse1 C1 C2 C3 x apt eq | None | None | Some x₁ = refl
-  ctxcollapse1 C1 C2 C3 x apt eq | None | None | None = eq
-
-  ctxcollapse2 : {A : Set} → (C1 C2 C3 : A ctx) (x : Nat) →
-                 (x # C2) →
-                 (C2 ∪ C3) x == C3 x →
-                 (C1 ∪ (C2 ∪ C3)) x == (C1 ∪ C3) x
-  ctxcollapse2 C1 C2 C3 x apt eq with C1 x
-  ctxcollapse2 C1 C2 C3 x apt eq | Some x₁ = refl
-  ctxcollapse2 C1 C2 C3 x apt eq | None with C2 x
-  ctxcollapse2 C1 C2 C3 x apt eq | None | Some x₁ = eq
-  ctxcollapse2 C1 C2 C3 x apt eq | None | None = refl
-
-  ctxcollapse3 : {A : Set} → (C1 C2 C3 : A ctx) (x : Nat) →
-                 (x # C2) →
-                 ((C1 ∪ C2) ∪ C3) x == (C1 ∪ C3) x
-  ctxcollapse3 C1 C2 C3 x apt with C1 x
-  ctxcollapse3 C1 C2 C3 x apt | Some x₁ = refl
-  ctxcollapse3 C1 C2 C3 x apt | None with C2 x
-  ctxcollapse3 C1 C2 C3 x apt | None | Some x₁ = abort (somenotnone apt)
-  ctxcollapse3 C1 C2 C3 x apt | None | None = refl
-
-  ∪assoc : {A : Set} (C1 C2 C3 : A ctx) → (C2 ## C3) → (C1 ∪ C2) ∪ C3 == C1 ∪ (C2 ∪ C3)
-  ∪assoc C1 C2 C3 (d1 , d2) = funext guts
-    where
-      case2 : (x : Nat) → x # C3 → dom C2 x → ((C1 ∪ C2) ∪ C3) x == (C1 ∪ (C2 ∪ C3)) x
-      case2 x apt dom = (ctxignore2 x (C1 ∪ C2) C3 apt) ·
-                        ! (ctxcollapse1 C1 C2 C3 x apt (lem-dom-union1 (d1 , d2) dom))
-
-      case34 : (x : Nat) → x # C2 → ((C1 ∪ C2) ∪ C3) x == (C1 ∪ (C2 ∪ C3)) x
-      case34 x apt = ctxcollapse3 C1 C2 C3 x apt ·
-                        ! (ctxcollapse2 C1 C2 C3 x apt (ctxignore1 x C2 C3 apt))
-
-      guts : (x : Nat) → ((C1 ∪ C2) ∪ C3) x == (C1 ∪ (C2 ∪ C3)) x
-      guts x with ctxindirect C2 x | ctxindirect C3 x
-      guts x | Inl (π1 , π2) | Inl (π3 , π4) = abort (somenotnone (! π4 · d1 x (π1 , π2)))
-      guts x | Inl x₁ | Inr x₂ = case2 x x₂ x₁
-      guts x | Inr x₁ | Inl x₂ = case34 x x₁
-      guts x | Inr x₁ | Inr x₂ = case34 x x₁
-
-  -- if x is apart from either part of a union, the answer comes from the other one
-  lem-dom-union-apt1 : {A : Set} {Δ1 Δ2 : A ctx} {x : Nat} {y : A} → x # Δ1 → ((Δ1 ∪ Δ2) x == Some y) → (Δ2 x == Some y)
-  lem-dom-union-apt1 {A} {Δ1} {Δ2} {x} {y} apt xin with Δ1 x
-  lem-dom-union-apt1 apt xin | Some x₁ = abort (somenotnone apt)
-  lem-dom-union-apt1 apt xin | None = xin
-
-  lem-dom-union-apt2 : {A : Set} {Δ1 Δ2 : A ctx} {x : Nat} {y : A} → x # Δ2 → ((Δ1 ∪ Δ2) x == Some y) → (Δ1 x == Some y)
-  lem-dom-union-apt2 {A} {Δ1} {Δ2} {x} {y} apt xin with Δ1 x
-  lem-dom-union-apt2 apt xin | Some x₁ = xin
-  lem-dom-union-apt2 apt xin | None = abort (somenotnone (! xin · apt))
-
-  ctx-split : {A : Set} {Γ : A ctx} {n m : Nat} {an am : A} →
-                         (n , an) ∈ (Γ ,, (m , am)) →
-                         (n , an) ∈ Γ ∨ (n # Γ ∧ n == m ∧ an == am)
-  ctx-split {Γ = Γ} {n} {m} {an} {am} n∈Γ+ with ctxindirect Γ n
-  ctx-split {Γ = Γ} {n} {m} {an} {am} n∈Γ+    | Inl (an' , n∈Γ)
-    rewrite ctxunicity {Γ = (Γ ,, (m , am))} n∈Γ+ (x∈∪l Γ (■ (m , am)) n an' n∈Γ) =
-      Inl n∈Γ
-  ctx-split {Γ = Γ} {n} {m} {an} {am} n∈Γ+    | Inr n#Γ
-    with natEQ n m
-  ...  | Inl refl = Inr (n#Γ , refl , ! (lem-apart-union-eq {Γ = Γ} n#Γ n∈Γ+))
-  ...  | Inr ne rewrite lem-neq-union-eq {Γ = Γ} ne n∈Γ+ = abort (somenotnone n#Γ)
-
-  -- the empty context is a left and right unit for ∪
-  ∅∪1 : {A : Set} {Γ : A ctx} → ∅ ∪ Γ == Γ
-  ∅∪1 {A} {Γ} = refl
-
-  ∅∪2 : {A : Set} {Γ : A ctx} → Γ ∪ ∅ == Γ
-  ∅∪2 {A} {Γ} = funext guts
-    where
-      guts : (x : Nat) → (Γ ∪ ∅) x == Γ x
-      guts x with Γ x
-      guts x | Some x₁ = refl
-      guts x | None = refl
+  exchange : {A : Set} {Γ : A ctx} {x1 x2 : Nat} {a1 a2 : A} →
+              x1 ≠ x2 →
+              Γ ,, (x1 , a1) ,, (x2 , a2) == Γ ,, (x2 , a2) ,, (x1 , a1)
+  exchange {A} {Γ} {x1} {x2} {a1} {a2} x1≠x2
+    = ctx-==-eqv fun
+      where
+        fun : (x : Nat) →
+               (Γ ,, (x1 , a1) ,, (x2 , a2)) ⟦ x ⟧ ==
+               (Γ ,, (x2 , a2) ,, (x1 , a1)) ⟦ x ⟧
+        fun x
+          with natEQ x x1 | natEQ x x2 | ctxindirect Γ x
+        fun x  | Inl refl | Inl refl | _
+          = abort (x1≠x2 refl)
+        fun x1 | Inl refl | Inr x≠x2 | Inl (_ , x1∈Γ)
+          with x,a∈Γ,,x,a {Γ = Γ} {x1} {a1}
+        ... | x∈Γ+1
+          with x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x,a∈Γ,,x,a {Γ = Γ ,, (x2 , a2)} {x1} {a1}
+        ... | x∈Γ++1 | x∈Γ++2
+          rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+        fun x1 | Inl refl | Inr x≠x2 | Inr x1#Γ
+          with x,a∈Γ,,x,a {Γ = Γ} {x1} {a1}
+        ... | x∈Γ+1
+          with x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x,a∈Γ,,x,a {Γ = Γ ,, (x2 , a2)} {x1} {a1}
+        ... | x∈Γ++1 | x∈Γ++2
+          rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+        fun x2 | Inr x≠x1 | Inl refl | Inl (_ , x2∈Γ)
+          with x,a∈Γ,,x,a {Γ = Γ} {x2} {a2}
+        ... | x∈Γ+2
+          with x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ+2 | x,a∈Γ,,x,a {Γ = Γ ,, (x1 , a1)} {x2} {a2}
+        ... | x∈Γ++1 | x∈Γ++2
+          rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+        fun x2 | Inr x≠x1 | Inl refl | Inr x2#Γ
+          with x,a∈Γ,,x,a {Γ = Γ} {x2} {a2}
+        ... | x∈Γ+2
+          with x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ+2 | x,a∈Γ,,x,a {Γ = Γ ,, (x1 , a1)} {x2} {a2}
+        ... | x∈Γ++1 | x∈Γ++2
+          rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+        fun x  | Inr x≠x1 | Inr x≠x2 | Inl (_ , x∈Γ)
+          with x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ   | x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ
+        ... | x∈Γ+1  | x∈Γ+2
+          with x∈Γ→x∈Γ+ {a' = a2} x≠x2 x∈Γ+1 | x∈Γ→x∈Γ+ {a' = a1} x≠x1 x∈Γ+2
+        ... | x∈Γ++1 | x∈Γ++2
+          rewrite lookup-cons-2 x∈Γ++1 | lookup-cons-2 x∈Γ++2 = refl
+        fun x  | Inr x≠x1 | Inr x≠x2 | Inr x#Γ
+          with x#Γ→x#Γ+ {a' = a1} x≠x1 x#Γ   | x#Γ→x#Γ+ {a' = a2} x≠x2 x#Γ
+        ... | x#Γ+1  | x#Γ+2
+          with x#Γ→x#Γ+ {a' = a2} x≠x2 x#Γ+1 | x#Γ→x#Γ+ {a' = a1} x≠x1 x#Γ+2
+        ... | x#Γ++1 | x#Γ++2
+          rewrite lookup-cp-1 x#Γ++1 | lookup-cp-1 x#Γ++2 = refl

@@ -40,7 +40,7 @@ module constraints-checks where
   constraints-unicity (XCMatch ne _) XCExRefl = abort (ne refl)
   constraints-unicity (XCMatch _ :=k) (XCMatch _ :=k') = constraints-unicity :=k :=k'
 
-  {- TODO : Necessary for progress, but not possible to prove right now
+  {- TODO : Necessary for progress
   constraints-dec : (r1 r2 : result) →
                     Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄:= k ∨
                     Constraints⦃ r1 , r2 ⦄:=∅

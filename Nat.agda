@@ -24,8 +24,11 @@ module Nat where
 
   _<_ : Nat → Nat → Set
   n < m = n ≤ m ∧ n ≠ m
-
   infix 40 _<_
+
+  difference : ∀{n m} → n ≤ m → Nat
+  difference {n} {.n} ≤refl = Z
+  difference {n} {.(1+ _)} (≤1+ n≤m-1) = 1+ (difference n≤m-1)
 
   -- basic theorems
 
@@ -201,3 +204,41 @@ module Nat where
   <dec-refl n | Inl (_ , ne)       = abort (ne refl)
   <dec-refl n | Inr (Inl refl)     = refl
   <dec-refl n | Inr (Inr (_ , ne)) = abort (ne refl)
+
+  -- difference theorems
+
+  m-n+n==m : ∀{n m} → (n≤m : n ≤ m) → difference n≤m + n == m
+  m-n+n==m ≤refl = refl
+  m-n+n==m (≤1+ n≤m) = 1+ap (m-n+n==m n≤m)
+
+  n+m-n==m : ∀{n m} → difference (n≤n+m {n} {m}) == m
+  n+m-n==m {n} {m} =
+    n+a==m+a→n==m (m-n+n==m {n} n≤n+m · +comm {n})
+
+  diff-proof-irrelevance : ∀{n m} →
+                             (n≤m1 n≤m2 : n ≤ m) →
+                             difference n≤m1 == difference n≤m2
+  diff-proof-irrelevance ≤refl ≤refl = refl
+  diff-proof-irrelevance ≤refl (≤1+ n≤m2) = abort (1+n≰n n≤m2)
+  diff-proof-irrelevance (≤1+ n≤m1) ≤refl = abort (1+n≰n n≤m1)
+  diff-proof-irrelevance (≤1+ n≤m1) (≤1+ n≤m2) = 1+ap (diff-proof-irrelevance n≤m1 n≤m2)
+
+  m-n==1+m-1+n : ∀{n m} →
+                   (n≤m : n ≤ m) →
+                   (1+n≤1+m : 1+ n ≤ 1+ m) →
+                   difference n≤m == difference 1+n≤1+m
+  m-n==1+m-1+n {n} {.n} ≤refl ≤refl = refl
+  m-n==1+m-1+n {n} {.n} ≤refl (≤1+ 1+n≤n) = abort (1+n≰n 1+n≤n)
+  m-n==1+m-1+n {.(1+ _)} {.(1+ _)} (≤1+ 1+m≤m) ≤refl = abort (1+n≰n 1+m≤m)
+  m-n==1+m-1+n {n} {.(1+ _)} (≤1+ n≤m) (≤1+ 1+n≤1+m) = 1+ap (m-n==1+m-1+n n≤m 1+n≤1+m)
+
+  m-n==m+s-n+s : ∀{n m s} →
+                   (n≤m : n ≤ m) →
+                   (n+s≤m+s : n + s ≤ m + s) →
+                   difference n≤m == difference n+s≤m+s
+  m-n==m+s-n+s {n} {m} {s = Z} n≤m n+s≤m+s
+    rewrite n+Z==n {n} | n+Z==n {m}
+      = diff-proof-irrelevance n≤m n+s≤m+s
+  m-n==m+s-n+s {n} {m} {s = 1+ s} n≤m n+s≤m+s
+    rewrite n+1+m==1+n+m {n} {s} | n+1+m==1+n+m {m} {s}
+      = (m-n==m+s-n+s n≤m (1+n≤1+m→n≤m n+s≤m+s)) · (m-n==1+m-1+n (1+n≤1+m→n≤m n+s≤m+s) n+s≤m+s)

@@ -63,15 +63,26 @@ module Nat where
   n+1+m==1+n+m {Z} = refl
   n+1+m==1+n+m {1+ n} = 1+ap n+1+m==1+n+m
 
+  n≠n+1+m : ∀{n m} → n ≠ n + 1+ m
+  n≠n+1+m {Z} {m} ()
+  n≠n+1+m {1+ n} {m} h = 1+inj-cp n≠n+1+m h
+
   +comm : ∀{a b} → a + b == b + a
   +comm {Z} {b} = ! n+Z==n
   +comm {1+ a} {Z} = 1+ap n+Z==n
   +comm {1+ a} {1+ b} with a + 1+ b | b + 1+ a | n+1+m==1+n+m {a} {b} | n+1+m==1+n+m {b} {a}
   +comm {1+ a} {1+ b} | _ | _ | refl | refl = 1+ap (1+ap (+comm {a}))
 
-  +assc : ∀{a b c} → a + b + c == a + (b + c)
+  +assc : ∀{a b c} → (a + b) + c == a + (b + c)
   +assc {Z} = refl
   +assc {1+ a} = 1+ap (+assc {a})
+
+  a+n==a+m→n==m : ∀{a n m} → a + n == a + m → n == m
+  a+n==a+m→n==m {Z} refl = refl
+  a+n==a+m→n==m {1+ a} a+n==a+m = a+n==a+m→n==m (1+inj a+n==a+m)
+
+  n+a==m+a→n==m : ∀{n m a} → n + a == m + a → n == m
+  n+a==m+a→n==m {n} {m} {a} n+a==m+a rewrite +comm {n} {a} | +comm {m} {a} = a+n==a+m→n==m n+a==m+a
 
   -- _≤_ theorems
 
@@ -90,6 +101,13 @@ module Nat where
   1+n≤1+m→n≤m {n} {.n} ≤refl = ≤refl
   1+n≤1+m→n≤m {n} {Z} (≤1+ h) = abort (1+n≰0 h)
   1+n≤1+m→n≤m {n} {1+ m} (≤1+ h) = ≤1+ (1+n≤1+m→n≤m h)
+
+  n+s≤m+s→n≤m : ∀{n m s} → n + s ≤ m + s → n ≤ m
+  n+s≤m+s→n≤m {n} {m} {s = Z} n+s≤m+s
+    rewrite n+Z==n {n} | n+Z==n {m} = n+s≤m+s
+  n+s≤m+s→n≤m {n} {m} {s = 1+ s} n+s≤m+s
+    rewrite n+1+m==1+n+m {n} {s} | n+1+m==1+n+m {m} {s}
+      = n+s≤m+s→n≤m (1+n≤1+m→n≤m n+s≤m+s)
 
   1+n≰n : ∀{n} → 1+ n ≤ n → ⊥
   1+n≰n {Z} h = abort (1+n≰0 h)
@@ -111,6 +129,15 @@ module Nat where
   ≤antisym {n} {.n} ≤refl m≤n = refl
   ≤antisym {n} {.(1+ _)} (≤1+ h1) h2 = abort (1+n≰n (≤trans h2 h1))
 
+  n≤n+m : ∀{n m} → n ≤ n + m
+  n≤n+m {n} {Z} with n + Z | n+Z==n {n}
+  n≤n+m {_} {Z} | _ | refl = ≤refl
+  n≤n+m {n} {1+ m} with n + 1+ m | ! (n+1+m==1+n+m {n} {m})
+  n≤n+m {n} {1+ m} | _ | refl = ≤trans n≤n+m (≤1+ ≤refl)
+
+  n≤m+n : ∀{n m} → n ≤ m + n
+  n≤m+n {n} {m} rewrite +comm {m} {n} = n≤n+m
+
   -- _<_ theorems
 
   n≮0 : ∀{n} → n < Z → ⊥
@@ -130,9 +157,47 @@ module Nat where
   π2 (<trans (π3 , π4) (≤refl , π6)) = abort (π6 refl)
   π2 (<trans (π3 , π4) (≤1+ π5 , π6)) refl = 1+n≰n (≤trans π3 π5)
 
+  <antisym : ∀{n m} → n < m → m < n → ⊥
+  <antisym (n≤m , n≠m) (m≤n , _) = n≠m (≤antisym n≤m m≤n)
+
+  <antirefl : ∀{n} → n < n → ⊥
+  <antirefl (_ , ne) = abort (ne refl)
+
+  n<m→n<s+m : ∀{n m s} → n < m → n < s + m
+  n<m→n<s+m {s = Z} n<m = n<m
+  n<m→n<s+m {s = 1+ s} n<m =
+    <trans (n<m→n<s+m {s = s} n<m) n<1+n
+
   n<m→1+n<1+m : ∀{n m} → n < m → 1+ n < 1+ m
   n<m→1+n<1+m (π3 , π4) = n≤m→1+n≤1+m π3 , 1+inj-cp π4
 
   0<1+n : ∀{n} → 0 < 1+ n
   0<1+n {Z} = ≤1+ ≤refl , (λ ())
   0<1+n {1+ n} = 0≤n , (λ ())
+
+  1+n≤m→n<m : ∀{n m} → 1+ n ≤ m → n < m
+  1+n≤m→n<m ≤refl = n<1+n
+  1+n≤m→n<m (≤1+ 1+n≤m) = <trans (1+n≤m→n<m 1+n≤m) n<1+n
+
+  n≤m→n<1+m : ∀{n m} → n ≤ m → n < 1+ m
+  n≤m→n<1+m {Z} n≤m = 0<1+n
+  n≤m→n<1+m {1+ n} n≤m = n<m→1+n<1+m (1+n≤m→n<m n≤m)
+
+  n<m→1+n≤m : ∀{n m} → n < m → 1+ n ≤ m
+  n<m→1+n≤m (≤refl , ne) = abort (ne refl)
+  n<m→1+n≤m (≤1+ n≤m , _) = n≤m→1+n≤1+m n≤m
+
+  <dec : (n m : Nat) → n < m ∨ n == m ∨ m < n
+  <dec n m with natEQ n m
+  ... | Inl refl = Inr (Inl refl)
+  ... | Inr ne   with ≤total {n} {m}
+  ... | Inl ≤refl     = abort (ne refl)
+  ... | Inl (≤1+ n≤m) = Inl (n≤m→n<1+m n≤m)
+  ... | Inr ≤refl     = abort (ne refl)
+  ... | Inr (≤1+ m≤n) = Inr (Inr (n≤m→n<1+m m≤n))
+
+  <dec-refl : (n : Nat) → <dec n n == Inr (Inl refl)
+  <dec-refl n with <dec n n
+  <dec-refl n | Inl (_ , ne)       = abort (ne refl)
+  <dec-refl n | Inr (Inl refl)     = refl
+  <dec-refl n | Inr (Inr (_ , ne)) = abort (ne refl)

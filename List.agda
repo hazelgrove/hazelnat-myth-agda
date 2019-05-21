@@ -33,6 +33,23 @@ module List where
   foldl f b [] = b
   foldl f b (a :: as) = foldl f (f b a) as
 
+  -- theorems
+
+  list-==-dec :  {A : Set} →
+                 (l1 l2 : List A) →
+                 ((a1 a2 : A) → a1 == a2 ∨ a1 ≠ a2) →
+                 l1 == l2 ∨ l1 ≠ l2
+  list-==-dec [] [] A-==-dec       = Inl refl
+  list-==-dec [] (_ :: _) A-==-dec = Inr (λ ())
+  list-==-dec (_ :: _) [] A-==-dec = Inr (λ ())
+  list-==-dec (h1 :: t1) (h2 :: t2) A-==-dec
+    with A-==-dec h1 h2
+  ... | Inr ne = Inr (λ where refl → ne refl)
+  ... | Inl refl
+    with list-==-dec t1 t2 A-==-dec
+  ... | Inr ne = Inr (λ where refl → ne refl)
+  ... | Inl refl = Inl refl
+
   -- the result of list indexing doesn't depend on the particular bounds checking proof
   index-proof-irrelevance : {ℓ : Level} {A : Set ℓ} {l : List A} {i : Nat} {p1 p2 : i < ∥ l ∥} →
                              l ⟦ i given p1 ⟧ == l ⟦ i given p2 ⟧

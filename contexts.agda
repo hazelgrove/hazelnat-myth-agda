@@ -287,14 +287,15 @@ module contexts where
           = abort (<antisym hx1<hx2 hx2<hx1)
 
   -- equality of contexts is decidable
-  ctx-==-dec : {A : Set} {Γ1 Γ2 : A ctx} →
-                ({a1 a2 : A} → a1 == a2 ∨ (a1 == a2 → ⊥)) →
-                Γ1 == Γ2 ∨ (Γ1 == Γ2 → ⊥)
-  ctx-==-dec {Γ1 = []} {[]} _ = Inl refl
-  ctx-==-dec {Γ1 = []} {x :: Γ2} _ = Inr (λ ())
-  ctx-==-dec {Γ1 = x :: Γ1} {[]} _ = Inr (λ ())
-  ctx-==-dec {Γ1 = (hx1 , ha1) :: t1} {(hx2 , ha2) :: t2} A==dec
-    with natEQ hx1 hx2 | A==dec {ha1} {ha2} | ctx-==-dec {Γ1 = t1} {t2} A==dec
+  ctx-==-dec : {A : Set}
+                (Γ1 Γ2 : A ctx) →
+                ((a1 a2 : A) → a1 == a2 ∨ a1 ≠ a2) →
+                Γ1 == Γ2 ∨ Γ1 ≠ Γ2
+  ctx-==-dec [] [] _ = Inl refl
+  ctx-==-dec [] (_ :: _) _ = Inr (λ ())
+  ctx-==-dec (_ :: _) [] _ = Inr (λ ())
+  ctx-==-dec ((hx1 , ha1) :: t1) ((hx2 , ha2) :: t2) A==dec
+    with natEQ hx1 hx2 | A==dec ha1 ha2 | ctx-==-dec t1 t2 A==dec
   ... | Inl refl | Inl refl | Inl refl = Inl refl
   ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
   ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl

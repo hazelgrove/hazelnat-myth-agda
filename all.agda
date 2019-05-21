@@ -9,6 +9,7 @@ open import lemmas-env
 
 
 open import results-checks
+open import decidability
 open import completeness
 open import constraints-checks
 open import preservation

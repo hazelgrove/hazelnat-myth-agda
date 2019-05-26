@@ -513,6 +513,185 @@ module core where
   E ⊢ e ⇒∅ = E ⊢ e ⌊ ∞ ⌋⇒∅
 
   -- TODO actually use _⊢_⇒∅ when doing progress
+  -- TODO we'll need some theorems for group
+  -- TODO also theorems for everything below, including synthesis and solve
+  group : constraints → worlds ctx
+  group = list⇒ctx
+
+  {-} TODO delete
+  group : constraints → worlds ctx
+  group [] = ∅
+  group ((u , E , ex) :: rest)
+    with group rest
+  ... | rest-group
+    with ctxindirect rest-group u
+  ... | Inl (worlds , u∈rest-group)
+          = rest-group ,, (u , (E , ex) :: worlds)
+  ... | Inr u#rest-group
+          = rest-group ,, (u , (E , ex) :: [])
+          -}
+
+  -- synthesis
+
+  -- TODO proof that if _·⊨ v, then v value
+  data _·⊨_ : ex → result → Set where
+    SCtor : ∀{ex v c} →
+              v value →
+              ex ·⊨ v →
+              (C[ c ] ex) ·⊨ (C[ c ] v)
+    STpl  : ∀{exs vs} →
+              ∥ exs ∥ == ∥ vs ∥ →
+              (∀{i v} →
+                 (i<∥exs∥ : i < ∥ exs ∥) →
+                 (i<∥vs∥ : i < ∥ vs ∥) →
+                 v == (vs ⟦ i given i<∥vs∥ ⟧) →
+                   v value ∧
+                   (exs ⟦ i given i<∥exs∥ ⟧) ·⊨ v) →
+              ⟨ exs ⟩ ·⊨ ⟨ vs ⟩
+    SPF   : ∀{E pf x e} →
+              (∀{i v ex} →
+                 (i<∥pf∥ : i < ∥ pf ∥) →
+                 (v , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 Σ[ v' ∈ result ] Σ[ k ∈ constraints ] (
+                    (E ,, (x , v)) ⊢ e ⇒ v' ⊣ k ∧
+                    v' value ∧
+                    ex ·⊨ v')) →
+              PF pf ·⊨ ([ E ]λ x => e)
+    -- TODO SPFFix
+
+  data _⊨_ : worlds → exp → Set where
+    SEmpty : ∀{e} → [] ⊨ e
+    SWorld : ∀{W E k ex v e} →
+               W ⊨ e →
+               E ⊢ e ⇒ v ⊣ k →
+               v value →
+               ex ·⊨ v →
+               ((E , ex) :: W) ⊨ e
+
+  mutual
+    -- synthesis by refinement
+    data _,_,_⊢_↑_ : denv → tctx → worlds → typ → exp → Set where
+      IRCtor : ∀{Σ' Γ W W' d cctx c τ e} →
+                 (d , cctx) ∈ π1 Σ' →
+                 (c , τ) ∈ cctx →
+                 W == map (λ {(E , ex) → (E , C[ c ] ex)}) W' →
+                 Σ' , Γ , W' ⊢ τ ↑ e →
+                 Σ' , Γ , W ⊢ D[ d ] ↑ (C[ c ] e)
+      IRTpl : ∀{Σ' Γ W τs es} →
+                ∥ τs ∥ == ∥ es ∥ →
+                -- The example in each world of W must be a tuple of size ∥ τs ∥
+                (∀{j} →
+                   (j<∥W∥ : j < ∥ W ∥) →
+                   Σ[ exs ∈ List ex ] (
+                      ⟨ exs ⟩ == π2 (W ⟦ j given j<∥W∥ ⟧) ∧
+                      ∥ τs ∥ == ∥ exs ∥)) →
+                -- For each index i in the example tuples and the type tuple,
+                -- there must be a W' composed of the examples indexed by i,
+                -- under which the ith type must synthesize the ith result
+                (∀{i} →
+                   (i<∥τs∥ : i < ∥ τs ∥) →
+                   (i<∥es∥ : i < ∥ es ∥) →
+                   Σ[ W' ∈ worlds ] (
+                      ∥ W ∥ == ∥ W' ∥ ∧
+                      (∀{j E exs} →
+                         (j<∥W∥ : j < ∥ W ∥) →
+                         (j<∥W'∥ : j < ∥ W' ∥) →
+                         (E , ⟨ exs ⟩) == W ⟦ j given j<∥W∥ ⟧ →
+                         (i<∥exs∥ : i < ∥ exs ∥) →
+                         W' ⟦ j given j<∥W'∥ ⟧ == (E , exs ⟦ i given i<∥exs∥ ⟧)) ∧
+                      Σ' , Γ , W' ⊢ τs ⟦ i given i<∥τs∥ ⟧ ↑ (es ⟦ i given i<∥es∥ ⟧))) →
+                Σ' , Γ , W ⊢ ⟨ τs ⟩ ↑ ⟨ es ⟩
+      IRLam : ∀{Σ' Γ W W' τ1 τ2 ⦇E,pf⦈s x e} →
+                ∥ ⦇E,pf⦈s ∥ == ∥ W ∥ →
+                -- Each example in the worlds is a partial function
+                -- The envs and pfs are destructed and retained in ⦇E,pf⦈s
+                (∀{i} →
+                   (i<∥W∥ : i < ∥ W ∥) →
+                   (i<∥Epfs∥ : i < ∥ ⦇E,pf⦈s ∥) →
+                   Σ[ E ∈ env ] Σ[ pf ∈ pf ] (
+                      (E , PF pf) == W ⟦ i given i<∥W∥ ⟧ ∧
+                      (E , pf) == ⦇E,pf⦈s ⟦ i given i<∥Epfs∥ ⟧)) →
+                W' == concat
+                        (map (λ {(E , pf) →
+                           map (λ {(v , ex) →
+                             ((E ,, (x , v)) , ex)})
+                             pf})
+                           ⦇E,pf⦈s) →
+                Σ' , (Γ ,, (x , τ1)) , W' ⊢ τ2 ↑ e →
+                Σ' , Γ , W ⊢ τ1 ==> τ2 ↑ (·λ x => e)
+      -- TODO IRFix
+      IRMatch : ∀{Σ' Γ W W' W'' τ e rules d cctx x} →
+                  -- choose a datatype
+                  (d , cctx) ∈ π1 Σ' →
+                  -- choose one fresh variable name that will be used for all cases
+                  x # Γ →
+                  -- synthesize a scrutinee
+                  Σ' , Γ ⊢ D[ d ] ↥ e →
+                  (∀{c rule} →
+                     (c , rule) ∈ rules →
+                     dom cctx c ∧ rule.parm rule == x) →
+                  ∥ W' ∥ == ∥ W ∥ →
+                  -- W' contains the same worlds as W, but each one is packaged with
+                  -- the constructor name and value that the scrutinee would evaluate
+                  -- to in that world.
+                  (∀{i E ex} →
+                     (i<∥W∥ : i < ∥ W ∥) →
+                     (i<∥W'∥ : i < ∥ W' ∥) →
+                     (E , ex) == W ⟦ i given i<∥W∥ ⟧ →
+                     Σ[ c ∈ Nat ] Σ[ v ∈ result ] (
+                       dom cctx c ∧
+                       v value ∧
+                       (c , E , ex , v) == W' ⟦ i given i<∥W'∥ ⟧ ∧
+                       E ⊢ e ⇒ C[ c ] v ⊣ [])) →
+                  -- For each c in the domain of cctx, W'' maps to a list of extended worlds,
+                  -- where each extended world has the specified example, but an env where the
+                  -- branch variable x is assosiated with the value that the scrutinee evaluates
+                  -- to under the original env.
+                  W'' ==
+                    (ctxmap (λ _ → []) cctx)
+                      ∪
+                    ctxmap (map λ {(E , ex , v) → (E ,, (x , v)) , ex}) (list⇒ctx W') →
+                  -- Each rule's branch expression must synthesize under the aforementioned
+                  -- extended worlds.
+                  (∀{c τc} →
+                     (c , τc) ∈ cctx →
+                     Σ[ ec ∈ exp ] Σ[ Wc ∈ worlds ] (
+                        (c , Wc) ∈ W'' ∧
+                        (c , |C x => ec) ∈ rules ∧
+                        Σ' , (Γ ,, (x , τc)) , Wc ⊢ τ ↑ ec)) →
+                  Σ' , Γ , W ⊢ τ ↑ case e of⦃· rules ·⦄
+      IRGuess : ∀{Σ' Γ W τ e} →
+                  Σ' , Γ ⊢ τ ↥ e →
+                  W ⊨ e →
+                  Σ' , Γ , W ⊢ τ ↑ e
+
+    -- synthesis by guess
+    data _,_⊢_↥_ : denv → tctx → typ → exp → Set where
+      EGVar : ∀{Σ' Γ τ x} →
+                (x , τ) ∈ Γ →
+                Σ' , Γ ⊢ τ ↥ X[ x ]
+      EGApp : ∀{Σ' Γ τ1 τ2 e1 e2} →
+                Σ' , Γ ⊢ τ1 ==> τ2 ↥ e1 →
+                Σ' , Γ , [] ⊢ τ1 ↑ e2 →
+                Σ' , Γ ⊢ τ2 ↥ (e1 ∘ e2)
+      EGGet : ∀{Σ' Γ τs i n e} →
+                n == ∥ τs ∥ →
+                (i<∥τs∥ : i < ∥ τs ∥) →
+                Σ' , Γ ⊢ ⟨ τs ⟩ ↥ e →
+                Σ' , Γ ⊢ τs ⟦ i given i<∥τs∥ ⟧ ↥ (get[ i th-of n ] e)
+
+  data _,_⊢Solve_:=_ : hctx → denv → constraints → exp ctx → Set where
+    Sol : ∀{Δ Σ' k g s} →
+            g == group k →
+            (∀{u} → dom g u → dom Δ u) →
+            (∀{u} → dom g u → dom s u) →
+            (∀{u} → dom s u → dom g u) →
+            (∀{u Wu Γu τu su} →
+               (u , Wu) ∈ g →
+               (u , Γu , τu) ∈ Δ →
+               (u , su) ∈ s →
+               Σ' , Γu , Wu ⊢ τu ↑ su) →
+            Δ , Σ' ⊢Solve k := s
 
 {- TODO
 

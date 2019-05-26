@@ -518,19 +518,6 @@ module core where
   group : constraints → worlds ctx
   group = list⇒ctx
 
-  {-} TODO delete
-  group : constraints → worlds ctx
-  group [] = ∅
-  group ((u , E , ex) :: rest)
-    with group rest
-  ... | rest-group
-    with ctxindirect rest-group u
-  ... | Inl (worlds , u∈rest-group)
-          = rest-group ,, (u , (E , ex) :: worlds)
-  ... | Inr u#rest-group
-          = rest-group ,, (u , (E , ex) :: [])
-          -}
-
   -- synthesis
 
   -- TODO proof that if _·⊨ v, then v value

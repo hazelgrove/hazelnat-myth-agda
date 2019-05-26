@@ -64,7 +64,7 @@ module completeness where
   eval-completeness Ecmp Γ⊢E (TALam _ _) EFun (ECLam ecmp) = RCLam Ecmp ecmp
   eval-completeness Ecmp Γ⊢E (TAFix _ _ _) EFix (ECFix ecmp) = RCFix Ecmp ecmp
   eval-completeness (ENVC Ecmp) Γ⊢E (TAVar _) (EVar h) ECVar = Ecmp h
-  eval-completeness Ecmp Γ⊢E (TAApp _ ta-f ta-arg) (EApp {Ef = Ef} {x} {r2 = r2} eval-f eval-arg eval-ef) (ECAp cmp-f cmp-arg)
+  eval-completeness Ecmp Γ⊢E (TAApp _ ta-f ta-arg) (EApp {Ef = Ef} {x} {r2 = r2} CF∞ eval-f eval-arg eval-ef) (ECAp cmp-f cmp-arg)
     with eval-completeness Ecmp Γ⊢E ta-f eval-f cmp-f | preservation Γ⊢E ta-f eval-f
   ... | RCLam (ENVC Efcmp) efcmp | TALam Γ'⊢Ef (TALam _ ta-ef)
     = eval-completeness (ENVC env-cmp) (EnvInd Γ'⊢Ef (preservation Γ⊢E ta-arg eval-arg)) ta-ef eval-ef efcmp
@@ -74,7 +74,7 @@ module completeness where
         env-cmp {x'} {rx'} h | Inl (_ , x'∈Ef) = Efcmp x'∈Ef
         env-cmp {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 =
           eval-completeness Ecmp Γ⊢E ta-arg eval-arg cmp-arg
-  eval-completeness Ecmp Γ⊢E (TAApp _ ta-f ta-arg) (EAppFix {Ef = Ef} {f} {x} {ef} {r2 = r2} h eval-f eval-arg eval-ef) (ECAp cmp-f cmp-arg)
+  eval-completeness Ecmp Γ⊢E (TAApp _ ta-f ta-arg) (EAppFix {Ef = Ef} {f} {x} {ef} {r2 = r2} CF∞ h eval-f eval-arg eval-ef) (ECAp cmp-f cmp-arg)
     rewrite h with eval-completeness Ecmp Γ⊢E ta-f eval-f cmp-f | preservation Γ⊢E ta-f eval-f
   ... | RCFix (ENVC Efcmp) efcmp | TAFix Γ'⊢Ef (TAFix _ _ ta-ef) =
     eval-completeness (ENVC new-Ef+-cmp) new-ctxcons ta-ef eval-ef efcmp
@@ -108,16 +108,15 @@ module completeness where
     RCGet (eval-completeness Ecmp Γ⊢E ta eval ecmp)
   eval-completeness Ecmp Γ⊢E (TACtor _ _ ta) (ECtor eval) (ECCtor ecmp) =
     RCCtor (eval-completeness Ecmp Γ⊢E ta eval ecmp)
-  eval-completeness {Σ' = Σ'} (ENVC Ecmp) Γ⊢E (TACase d∈Σ'1 ta h1 h2) (EMatch {E = E} {xj = xj} {r' = r'} j<∥rules∥ form eval eval-ej) (ECCase ecmp rules-cmp)
-    with h2 j<∥rules∥ form
-  ... | _ , _ , _ , _ , _ , Cj∈cctx1 , ta-ej
+  eval-completeness {Σ' = Σ'} (ENVC Ecmp) Γ⊢E (TACase d∈Σ'1 ta h1 h2) (EMatch {E = E} {xc = xc} {r' = r'} form eval eval-ec) (ECCase ecmp rules-cmp)
+    with h2 form
+  ... | _ , _ , _ , _ , c∈cctx1 , ta-ec
     with preservation Γ⊢E ta eval
-  ... | TACtor {cctx = cctx} d∈Σ' Cj∈cctx ta-r'
-    rewrite ctxunicity {Γ = π1 Σ'} d∈Σ'1 d∈Σ' | ctxunicity {Γ = cctx} Cj∈cctx1 Cj∈cctx with rules-cmp j<∥rules∥
-  ... | ejcmp rewrite ! form =
-    eval-completeness (ENVC new-E-cmp) (EnvInd Γ⊢E ta-r') ta-ej eval-ej ejcmp
+  ... | TACtor {cctx = cctx} d∈Σ' c∈cctx ta-r'
+    rewrite ctxunicity {Γ = π1 Σ'} d∈Σ'1 d∈Σ' | ctxunicity {Γ = cctx} c∈cctx1 c∈cctx =
+    eval-completeness (ENVC new-E-cmp) (EnvInd Γ⊢E ta-r') ta-ec eval-ec (rules-cmp form)
     where
-      new-E-cmp : ∀{x' rx'} → (x' , rx') ∈ (E ,, (xj , r')) → rx' rcomplete
+      new-E-cmp : ∀{x' rx'} → (x' , rx') ∈ (E ,, (xc , r')) → rx' rcomplete
       new-E-cmp {x'} {rx'} x'∈E+ with ctx-split {Γ = E} x'∈E+
       ... | Inl (_ , x'∈E) = Ecmp x'∈E
       ... | Inr (_ , rx'==r') rewrite rx'==r'

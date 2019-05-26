@@ -149,7 +149,7 @@ module constraints-checks where
             { (_ , XCExRefl)      → cf (_ , XCExRefl) ;
               (_ , XCMatch _ rec) → cf (_ , rec) }
     ... | Inl (_ , C<r1,r2>)
-      with list<rule>-==-dec rules1 rules2
+      with ctx<rule>-==-dec rules1 rules2
     ... | Inr ne = Inr λ
             { (_ , XCExRefl)      → ne refl ;
               (_ , XCMatch _ rec) → ne refl }

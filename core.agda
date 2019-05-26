@@ -94,9 +94,8 @@ module core where
 
     record rule : Set where
       inductive
-      constructor |C[_]_=>_
+      constructor |C_=>_
       field
-        ctor   : Nat
         parm   : Nat
         branch : exp
 
@@ -109,7 +108,7 @@ module core where
       ⟨_⟩           : List exp → exp
       get[_th-of_]_ : Nat → Nat → exp → exp
       C[_]_         : Nat → exp → exp
-      case_of⦃·_·⦄ : exp → List rule → exp
+      case_of⦃·_·⦄ : exp → rule ctx → exp
       ??[_]         : Nat → exp
       PF            : pf → exp
       PBE:assert    : exp → exp → exp
@@ -124,7 +123,7 @@ module core where
       HNNCtor : ∀{c e u} → hole-name-new e u → hole-name-new (C[ c ] e) u
       HNNCase : ∀{e rules u} →
                   hole-name-new e u →
-                  (∀{i} → (h : i < ∥ rules ∥) → hole-name-new (rule.branch (rules ⟦ i given h ⟧)) u) →
+                  (∀{c rule} → (c , rule) ∈ rules → hole-name-new (rule.branch rule) u) →
                   hole-name-new (case e of⦃· rules ·⦄) u
       HNNHole : ∀{u' u} → u' ≠ u → hole-name-new (??[ u' ]) u
       -- pf shouldn't be incomplete, so we don't define a case for incomplete pfs in which the hole would
@@ -142,7 +141,7 @@ module core where
       HDCtor : ∀{c e e'} → holes-disjoint e e' → holes-disjoint (C[ c ] e) e'
       HDCase : ∀{e rules e'} →
                  holes-disjoint e e' →
-                 (∀{i} → (h : i < ∥ rules ∥) → holes-disjoint (rule.branch (rules ⟦ i given h ⟧)) e') →
+                 (∀{c rule} → (c , rule) ∈ rules → holes-disjoint (rule.branch rule) e') →
                  holes-disjoint (case e of⦃· rules ·⦄) e'
       HDHole : ∀{u e'} → hole-name-new e' u → holes-disjoint (??[ u ]) e'
       -- pf shouldn't be incomplete, so we don't define a case for incomplete pfs in which the holes would
@@ -160,7 +159,7 @@ module core where
       ECCtor : ∀{c e} → e ecomplete → (C[ c ] e) ecomplete
       ECCase : ∀{e rules} →
                  e ecomplete →
-                 (∀{i} → (i<∥rules∥ : i < ∥ rules ∥) → (rule.branch (rules ⟦ i given i<∥rules∥ ⟧)) ecomplete) →
+                 (∀{c rule} → (c , rule) ∈ rules → (rule.branch rule) ecomplete) →
                  case e of⦃· rules ·⦄ ecomplete
       ECPF   : ∀{pf} → pf pf-complete → (PF pf) ecomplete
       ECAsrt : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (PBE:assert e1 e2) ecomplete
@@ -207,19 +206,17 @@ module core where
       TACase : ∀{Δ Σ' Γ d cctx e rules τ} →
                  (d , cctx) ∈ π1 Σ' →
                  Δ , Σ' , Γ ⊢ e :: D[ d ] →
-                 (∀{c} →
-                    dom cctx c →
-                    -- There must be a rule for each constructor, i.e. case exhuastiveness
-                    Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
-                 (∀{i ci xi ei} →
-                    (i<∥rules∥ : i < ∥ rules ∥) →
-                    |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
-                      xi # Γ ∧
-                      (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → xi ≠ rule.parm (rules ⟦ j given j<∥rules∥ ⟧)) ∧
-                      holes-disjoint ei e ∧
-                      (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → holes-disjoint ei (rule.branch (rules ⟦ j given j<∥rules∥ ⟧))) ∧
+                 -- There must be a rule for each constructor, i.e. case exhuastiveness
+                 (∀{c} → dom cctx c → dom rules c) →
+                 (∀{c xc ec} →
+                    (c , |C xc => ec) ∈ rules →
+                      xc # Γ ∧
+                      holes-disjoint ec e ∧
+                      (∀{c' xc' ec'} → (c' , |C xc' => ec') ∈ rules → c ≠ c' → holes-disjoint ec ec') ∧
                       -- The constructor of each rule must be of the right datatype, and the branch must type-check
-                      Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
+                      Σ[ τc ∈ typ ] (
+                         (c , τc) ∈ cctx ∧
+                         Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
                  Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
       -- TODO we may have a problem with weakening
       TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
@@ -251,7 +248,7 @@ module core where
       [_]??[_]         : env → Nat → result
       _∘_              : result → result → result
       get[_th-of_]_    : Nat → Nat → result → result
-      [_]case_of⦃·_·⦄ : env → result → List rule → result
+      [_]case_of⦃·_·⦄ : env → result → rule ctx → result
       PF              : pf → result
 
     -- values are final and complete (i.e. they have no holes)
@@ -284,7 +281,7 @@ module core where
       RCCase : ∀{E r rules} →
                  E env-complete →
                  r rcomplete →
-                 (∀{i} → (i<∥rules∥ : i < ∥ rules ∥) → (rule.branch (rules ⟦ i given i<∥rules∥ ⟧)) ecomplete) →
+                 (∀{c rule} → (c , rule) ∈ rules → (rule.branch rule) ecomplete) →
                  [ E ]case r of⦃· rules ·⦄ rcomplete
       RCPF   : ∀{pf} → pf pf-complete → (PF pf) rcomplete
 
@@ -329,17 +326,15 @@ module core where
                  (d , cctx) ∈ π1 Σ' →
                  Δ , Σ' , Γ ⊢ E →
                  Δ , Σ' ⊢ r ·: D[ d ] →
-                 (∀{c} →
-                    dom cctx c →
-                    -- There must be a rule for each constructor, i.e. case exhuastiveness
-                    Σ[ i ∈ Nat ] ((i<∥rules∥ : i < ∥ rules ∥) → (rule.ctor (rules ⟦ i given i<∥rules∥ ⟧) == c))) →
-                 (∀{i ci xi ei} →
-                    (i<∥rules∥ : i < ∥ rules ∥) →
-                    |C[ ci ] xi => ei == rules ⟦ i given i<∥rules∥ ⟧ →
-                      xi # Γ ∧
-                      (∀{j} → (j<∥rules∥ : j < ∥ rules ∥) → i ≠ j → xi ≠ rule.parm (rules ⟦ j given j<∥rules∥ ⟧)) ∧
+                 -- There must be a rule for each constructor, i.e. case exhuastiveness
+                 (∀{c} → dom cctx c → dom rules c) →
+                 (∀{c xc ec} →
+                    (c , |C xc => ec) ∈ rules →
+                      xc # Γ ∧
                       -- The constructor of each rule must be of the right datatype, and the branch must type-check
-                      Σ[ τi ∈ typ ] ((ci , τi) ∈ cctx ∧ Δ , Σ' , (Γ ,, (xi , τi)) ⊢ ei :: τ)) →
+                      Σ[ τc ∈ typ ] (
+                         (c , τc) ∈ cctx ∧
+                         Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
                  Δ , Σ' ⊢ [ E ]case r of⦃· rules ·⦄ ·: τ
       TAHole : ∀{Δ Σ' Γ E u τ} →
                  (u , (Γ , τ)) ∈ Δ →
@@ -388,68 +383,134 @@ module core where
   Constraints⦃_,_⦄:=∅ : result → result → Set
   Constraints⦃ r1 , r2 ⦄:=∅ = Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄:= k → ⊥
 
-  -- Big step evaluation
-  data _⊢_⇒_⊣_ : env → exp → result → constraints → Set where
-    EFun             : ∀{E x e} → E ⊢ ·λ x => e ⇒ [ E ]λ x => e ⊣ []
-    EFix             : ∀{E f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
-    EVar             : ∀{E x r} → (x , r) ∈ E → E ⊢ X[ x ] ⇒ r ⊣ []
-    EHole            : ∀{E u} → E ⊢ ??[ u ] ⇒ [ E ]??[ u ] ⊣ []
-    ETuple           : ∀{E es rs ks} →
+
+  data Fuel : Set where
+    ∞ : Fuel
+    ⛽⟨_⟩ : Nat → Fuel
+
+  data _⛽⇓_ : Fuel → Fuel → Set where
+    CF∞ : ∞ ⛽⇓ ∞
+    CF⛽ : ∀{n} → ⛽⟨ 1+ n ⟩ ⛽⇓ ⛽⟨ n ⟩
+
+  -- Generic big step evaluation
+  -- - If ⌊ ⛽ ⌋ is ∞, then there is no beta reduction limit,
+  --   but the judgment will not go through unless evaluation eventually terminates.
+  -- - If ⌊ ⛽ ⌋ is ⛽⟨ n ⟩, then the beta reduction limit is at most n,
+  --   but if the limit is reached, the judgment will go through automatically.
+  data _⊢_⌊_⌋⇒_⊣_ : env → exp → Fuel → result → constraints → Set where
+    EFun             : ∀{E ⛽ x e} → E ⊢ ·λ x => e ⌊ ⛽ ⌋⇒ [ E ]λ x => e ⊣ []
+    EFix             : ∀{E ⛽ f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
+    EVar             : ∀{E ⛽ x r} → (x , r) ∈ E → E ⊢ X[ x ] ⌊ ⛽ ⌋⇒ r ⊣ []
+    EHole            : ∀{E ⛽ u} → E ⊢ ??[ u ] ⌊ ⛽ ⌋⇒ [ E ]??[ u ] ⊣ []
+    ETuple           : ∀{E ⛽ es rs ks} →
                          ∥ es ∥ == ∥ rs ∥ →
                          ∥ es ∥ == ∥ ks ∥ →
                          -- TODO this should probably factored out somehow
                          (∀{i} →
-                            (h : i < ∥ es ∥) →
-                            (hr : i < ∥ rs ∥) →
-                            (hk : i < ∥ ks ∥) →
-                            E ⊢ es ⟦ i given h ⟧ ⇒ rs ⟦ i given hr ⟧ ⊣ (ks ⟦ i given hk ⟧)) →
-                         E ⊢ ⟨ es ⟩ ⇒ ⟨ rs ⟩ ⊣ foldl _++_ [] ks
-    ECtor            : ∀{E c e r k} → E ⊢ e ⇒ r ⊣ k → E ⊢ C[ c ] e ⇒ (C[ c ] r) ⊣ k
-    EApp             : ∀{E e1 e2 Ef x ef kf r2 k2 r k} →
-                         E ⊢ e1 ⇒ ([ Ef ]λ x => ef) ⊣ kf →
-                         E ⊢ e2 ⇒ r2 ⊣ k2 →
-                         (Ef ,, (x , r2)) ⊢ ef ⇒ r ⊣ k →
-                         E ⊢ e1 ∘ e2 ⇒ r ⊣ kf ++ k2 ++ k
-    EAppFix          : ∀{E e1 e2 Ef f x ef r1 k1 r2 k2 r k} →
+                            (i<∥es∥ : i < ∥ es ∥) →
+                            (i<∥rs∥ : i < ∥ rs ∥) →
+                            (i<∥ks∥ : i < ∥ ks ∥) →
+                            E ⊢ es ⟦ i given i<∥es∥ ⟧ ⌊ ⛽ ⌋⇒ rs ⟦ i given i<∥rs∥ ⟧ ⊣ (ks ⟦ i given i<∥ks∥ ⟧)) →
+                         E ⊢ ⟨ es ⟩ ⌊ ⛽ ⌋⇒ ⟨ rs ⟩ ⊣ foldl _++_ [] ks
+    ECtor            : ∀{E ⛽ c e r k} →
+                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
+                         E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ k
+    EApp             : ∀{E ⛽ ⛽↓ e1 e2 Ef x ef kf r2 k2 r k} →
+                         ⛽ ⛽⇓ ⛽↓ →
+                         E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ kf →
+                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                         (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ k →
+                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ kf ++ k2 ++ k
+    EAppFix          : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2 r k} →
+                         ⛽ ⛽⇓ ⛽↓ →
                          r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                         E ⊢ e1 ⇒ r1 ⊣ k1 →
-                         E ⊢ e2 ⇒ r2 ⊣ k2 →
-                         (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⇒ r ⊣ k →
-                         E ⊢ e1 ∘ e2 ⇒ r ⊣ k1 ++ k2 ++ k
-    EAppUnfinished   : ∀{E e1 e2 r1 k1 r2 k2} →
-                         E ⊢ e1 ⇒ r1 ⊣ k1 →
+                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                         (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ k →
+                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ k1 ++ k2 ++ k
+    EAppUnfinished   : ∀{E ⛽ e1 e2 r1 k1 r2 k2} →
+                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
                          (∀{Ef x ef} → r1 ≠ ([ Ef ]λ x => ef)) →
                          (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
-                         E ⊢ e2 ⇒ r2 ⊣ k2 →
-                         E ⊢ e1 ∘ e2 ⇒ (r1 ∘ r2) ⊣ k1 ++ k2
-    EGet             : ∀{E i e rs k} →
+                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ k1 ++ k2
+    EGet             : ∀{E ⛽ i e rs k} →
                          (h : i < ∥ rs ∥) →
-                         E ⊢ e ⇒ ⟨ rs ⟩ ⊣ k →
-                         E ⊢ get[ i th-of ∥ rs ∥ ] e ⇒ (rs ⟦ i given h ⟧) ⊣ k
-    EGetUnfinished   : ∀{E i n e r k} → E ⊢ e ⇒ r ⊣ k → (∀{rs} → r ≠ ⟨ rs ⟩) → E ⊢ get[ i th-of n ] e ⇒ (get[ i th-of n ] r) ⊣ k
-    EMatch           : ∀{E e rules j Cj xj ej r' k' r k} →
-                         (h : j < ∥ rules ∥) →
-                         |C[ Cj ] xj => ej == rules ⟦ j given h ⟧ →
-                         E ⊢ e ⇒ (C[ Cj ] r') ⊣ k' →
-                         (E ,, (xj , r')) ⊢ ej ⇒ r ⊣ k →
-                         E ⊢ case e of⦃· rules ·⦄ ⇒ r ⊣ k' ++ k
-    EMatchUnfinished : ∀{E e rules r k} →
-                         E ⊢ e ⇒ r ⊣ k →
-                         (∀{j e'} → r ≠ (C[ j ] e')) →
-                         E ⊢ case e of⦃· rules ·⦄ ⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
-    EAsrt            : ∀{E e1 r1 k1 e2 r2 k2 k3} →
-                         E ⊢ e1 ⇒ r1 ⊣ k1 →
-                         E ⊢ e2 ⇒ r2 ⊣ k2 →
+                         E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ rs ⟩ ⊣ k →
+                         E ⊢ get[ i th-of ∥ rs ∥ ] e ⌊ ⛽ ⌋⇒ (rs ⟦ i given h ⟧) ⊣ k
+    EGetUnfinished   : ∀{E ⛽ i n e r k} →
+                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
+                         (∀{rs} → r ≠ ⟨ rs ⟩) →
+                         E ⊢ get[ i th-of n ] e ⌊ ⛽ ⌋⇒ (get[ i th-of n ] r) ⊣ k
+    EMatch           : ∀{E ⛽ e rules c xc ec r' k' r k} →
+                         (c , |C xc => ec) ∈ rules →
+                         E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
+                         (E ,, (xc , r')) ⊢ ec ⌊ ⛽ ⌋⇒ r ⊣ k →
+                         E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ r ⊣ k' ++ k
+    EMatchUnfinished : ∀{E ⛽ e rules r k} →
+                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
+                         (∀{c e'} → r ≠ (C[ c ] e')) →
+                         E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
+    EAsrt            : ∀{E ⛽ e1 r1 k1 e2 r2 k2 k3} →
+                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
                          Constraints⦃ r1 , r2 ⦄:= k3 →
-                         E ⊢ PBE:assert e1 e2 ⇒ ⟨ [] ⟩ ⊣ k1 ++ k2 ++ k3
+                         E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒ ⟨ [] ⟩ ⊣ k1 ++ k2 ++ k3
+    EDepthLimit      : ∀{E e r} → E ⊢ e ⌊ ⛽⟨ 0 ⟩ ⌋⇒ r ⊣ []
 
-  -- This is true iff evaluation would fail due to unsatisfiable constraints
-  data _⊢_⇒∅ : env → exp → Set where
-    EFail : ∀{E e1 r1 k1 e2 r2 k2} →
-              E ⊢ e1 ⇒ r1 ⊣ k1 →
-              E ⊢ e2 ⇒ r2 ⊣ k2 →
-              Constraints⦃ r1 , r2 ⦄:=∅ →
-              E ⊢ PBE:assert e1 e2 ⇒∅
+  -- Big step evaluation - the ordinary variety with no beta reduction counting or limit
+  _⊢_⇒_⊣_ : env → exp → result → constraints → Set
+  E ⊢ e ⇒ r ⊣ k = E ⊢ e ⌊ ∞ ⌋⇒ r ⊣ k
+
+  -- Generic constraint failure - this goes through if evaluation would fail due to unsatisfiable constraints,
+  -- and it may go through if evaluation diverges. But it cannot be true if evaluation converges and all constraints are valid.
+  data _⊢_⌊_⌋⇒∅ : env → exp → Fuel → Set where
+    EFTpl        : ∀{E ⛽ es j} →
+                     (j<∥es∥ : j < ∥ es ∥) →
+                     E ⊢ es ⟦ j given j<∥es∥ ⟧ ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ ⟨ es ⟩ ⌊ ⛽ ⌋⇒∅
+    EFCtor       : ∀{E ⛽ c e} →
+                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒∅
+    EFAppFun     : ∀{E ⛽ e1 e2} →
+                     E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+    EFAppArg     : ∀{E ⛽ e1 e2} →
+                     E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+    EFAppEval    : ∀{E ⛽ ⛽↓ e1 Ef x ef k1 e2 r2 k2} →
+                     ⛽ ⛽⇓ ⛽↓ →
+                     E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ k1 →
+                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                     (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
+                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+    EFAppFixEval : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2} →
+                     ⛽ ⛽⇓ ⛽↓ →
+                     r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                     E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                     (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
+                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+    EFGet        : ∀{E ⛽ i n e} →
+                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ get[ i th-of n ] e ⌊ ⛽ ⌋⇒∅
+    EFMatchScrut : ∀{E ⛽ e rules} →
+                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
+    EFMatchRule  : ∀{E ⛽ e rules c xc ec r' k'} →
+                     (c , |C xc => ec) ∈ rules →
+                     E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
+                     (E ,, (xc , r')) ⊢ ec ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
+    EFAsrt       : ∀{E ⛽ e1 r1 k1 e2 r2 k2} →
+                     E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                     Constraints⦃ r1 , r2 ⦄:=∅ →
+                     E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
+
+  -- Constraint failure - the ordinary version with no beta reduction counting or limit
+  _⊢_⇒∅ : env → exp → Set
+  E ⊢ e ⇒∅ = E ⊢ e ⌊ ∞ ⌋⇒∅
 
   -- TODO actually use _⊢_⇒∅ when doing progress
 

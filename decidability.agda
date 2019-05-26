@@ -16,6 +16,8 @@ module decidability where
     -- decidability theorem for its value type, and for environments that
     -- value type is result, so the termination checker complains. To fix
     -- this, we redefine type-specific versions of these theorems here.
+    -- Note that we really should not be destructing contexts via `_::_` -
+    -- here we only do that because we copied this code from the contexts file.
 
     list<result>-==-dec : (l1 l2 : List result) →
                            l1 == l2 ∨ l1 ≠ l2
@@ -43,25 +45,6 @@ module decidability where
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
 
-    list<rule>-==-dec : (l1 l2 : List rule) →
-                         l1 == l2 ∨ l1 ≠ l2
-    list<rule>-==-dec [] []       = Inl refl
-    list<rule>-==-dec [] (_ :: _) = Inr (λ ())
-    list<rule>-==-dec (_ :: _) [] = Inr (λ ())
-    list<rule>-==-dec ((|C[ c1 ] x1 => e1) :: t1) ((|C[ c2 ] x2 => e2) :: t2)
-      with natEQ c1 c2
-    ... | Inr ne = Inr (λ where refl → ne refl)
-    ... | Inl refl
-      with natEQ x1 x2
-    ... | Inr ne = Inr (λ where refl → ne refl)
-    ... | Inl refl
-      with exp-==-dec e1 e2
-    ... | Inr ne = Inr (λ where refl → ne refl)
-    ... | Inl refl
-      with list<rule>-==-dec t1 t2
-    ... | Inr ne   = Inr (λ where refl → ne refl)
-    ... | Inl refl = Inl refl
-
     list<ex>-==-dec : (l1 l2 : List ex) →
                          l1 == l2 ∨ l1 ≠ l2
     list<ex>-==-dec [] []       = Inl refl
@@ -86,6 +69,28 @@ module decidability where
     ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
     ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
+
+    ctx<rule>-==-dec : (rules1 rules2 : rule ctx) →
+                        rules1 == rules2 ∨ rules1 ≠ rules2
+    ctx<rule>-==-dec [] [] = Inl refl
+    ctx<rule>-==-dec [] (_ :: _) = Inr (λ ())
+    ctx<rule>-==-dec (_ :: _) [] = Inr (λ ())
+    ctx<rule>-==-dec ((hx1 , hrule1) :: t1) ((hx2 , hrule2) :: t2)
+      with natEQ hx1 hx2 | rule-==-dec hrule1 hrule2 | ctx<rule>-==-dec t1 t2
+    ... | Inl refl | Inl refl | Inl refl = Inl refl
+    ... | Inl refl | Inl refl | Inr ne   = Inr λ where refl → ne refl
+    ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
+    ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
+
+    rule-==-dec : (rule1 rule2 : rule) →
+                   rule1 == rule2 ∨ rule1 ≠ rule2
+    rule-==-dec (|C parm1 => branch1) (|C parm2 => branch2)
+      with natEQ parm1 parm2
+    ... | Inr ne   = Inr λ where refl → ne refl
+    ... | Inl refl
+      with exp-==-dec branch1 branch2
+    ... | Inr ne   = Inr λ where refl → ne refl
+    ... | Inl refl = Inl refl
 
     pf-==-dec : (pf1 pf2 : pf) →
                  pf1 == pf2 ∨ pf1 ≠ pf2
@@ -251,7 +256,7 @@ module decidability where
       with exp-==-dec e1 e2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl
-      with list<rule>-==-dec rules1 rules2
+      with ctx<rule>-==-dec rules1 rules2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
     exp-==-dec case e1 of⦃· rules1 ·⦄ (·λ x => e2) = Inr (λ ())
@@ -432,7 +437,7 @@ module decidability where
       with result-==-dec r1 r2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl
-      with list<rule>-==-dec rules1 rules2
+      with ctx<rule>-==-dec rules1 rules2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
     result-==-dec [ E ]case r of⦃· rules ·⦄ ([ _ ]λ _ => _) = Inr (λ ())

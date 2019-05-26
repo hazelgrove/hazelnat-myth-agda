@@ -33,6 +33,10 @@ module List where
   foldl f b [] = b
   foldl f b (a :: as) = foldl f (f b a) as
 
+  concat : {ℓ : Level} → {A : Set ℓ} → List (List A) → List A
+  concat [] = []
+  concat (l1 :: rest) = l1 ++ (concat rest)
+
   -- theorems
 
   list-==-dec :  {A : Set} →
@@ -88,12 +92,6 @@ module List where
   ++assc {l} {A} {x :: a1} {a2} {a3} with a1 ++ a2 ++ a3 | ++assc {l} {A} {a1} {a2} {a3}
   ++assc {l} {A} {x :: a1} {a2} {a3} | _ | refl = refl
 
-  -- map theorem
-  map-++-comm : ∀{l1 l2 A B f a b} → map f a ++ map f b == map {l1} {l2} {A} {B} f (a ++ b)
-  map-++-comm {a = []} = refl
-  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} with map f (t ++ b) | map-++-comm {l1} {l2} {A} {B} {f} {t} {b}
-  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} | _ | refl = refl
-
   -- ∥_∥ theorem
   ∥-++-comm : ∀{l A a1 a2} → ∥ a1 ∥ + (∥_∥ {l} {A} a2) == ∥ a1 ++ a2 ∥
   ∥-++-comm {l} {A} {[]} {a2} = refl
@@ -105,6 +103,12 @@ module List where
                              ((l1 ++ (a :: []) ++ l2) ⟦ ∥ l1 ∥ given h ⟧ == a)
   ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = []} h = refl
   ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = a1 :: l1rest} {l2} {a} h = ⦇l1++[a]++l2⦈⟦∥l1∥⟧==a {l1 = l1rest} {l2} {a} (1+n<1+m→n<m h)
+
+  -- map theorem
+  map-++-comm : ∀{l1 l2 A B f a b} → map f a ++ map f b == map {l1} {l2} {A} {B} f (a ++ b)
+  map-++-comm {a = []} = refl
+  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} with map f (t ++ b) | map-++-comm {l1} {l2} {A} {B} {f} {t} {b}
+  map-++-comm {l1} {l2} {A} {B} {f} {h :: t} {b} | _ | refl = refl
 
   -- foldl theorem
   foldl-++ : {ℓ1 ℓ2 : Level} {A : Set ℓ1} {B : Set ℓ2} {l1 l2 : List A} {f : B → A → B} {b0 : B} →

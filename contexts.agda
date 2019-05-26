@@ -48,6 +48,10 @@ module contexts where
   _#_ : {A : Set} (n : Nat) → (Γ : A ctx) → Set
   x # Γ = dom Γ x → ⊥
 
+  -- TODO theorems
+  ctxmap : {A B : Set} → (A → B) → A ctx → B ctx
+  ctxmap f Γ = map (λ {(hx , ha) → (hx , f ha)}) Γ
+
   -- The primary way to test membership is to use _∈_,
   -- but this can be used in cases where using _∈_
   -- would be too verbose or awkward.
@@ -424,3 +428,29 @@ module contexts where
           with x#Γ→x#Γ+ {a' = a2} x≠x2 x#Γ+1 | x#Γ→x#Γ+ {a' = a1} x≠x1 x#Γ+2
         ... | x#Γ++1 | x#Γ++2
           rewrite lookup-cp-1 x#Γ++1 | lookup-cp-1 x#Γ++2 = refl
+
+  ---- one more definition (relies on ctxindirect) ----
+
+  -- TODO theorems
+  -- TODO move back to normal place after updating to agda 6
+  list⇒ctx : {A : Set} → List (Nat ∧ A) → (List A) ctx
+  list⇒ctx [] = ∅
+  list⇒ctx ((n , a) :: l)
+    with list⇒ctx l
+  ... | l-ctx
+    with ctxindirect l-ctx n
+  ... | Inl (as , n∈l-ctx)
+          = l-ctx ,, (n , a :: as)
+  ... | Inr n#rest-ctx
+          = l-ctx ,, (n , a :: [])
+
+  -- TODO maybe define ctx⇒list then refactor this
+  union' : {A : Set} → A ctx → A ctx → Nat → A ctx
+  union' Γ1 [] _ = Γ1
+  union' Γ1 ((hx , ha) :: Γ2) offset
+    = union' (Γ1 ,, (hx + offset , ha)) Γ2 (offset + 1+ hx)
+
+  -- TODO theorems
+  -- a ∪ b is the union of a and b, with mappings in b overriding those in a
+  _∪_ : {A : Set} → A ctx → A ctx → A ctx
+  Γ1 ∪ Γ2 = union' Γ1 Γ2 0

@@ -6,19 +6,12 @@ open import contexts
 open import core
 
 open import preservation
-open import lemmas-complete
 open import results-checks
 
 module completeness where
   -- if an example type-checks, it's complete
   ex-ta-complete : ∀{Σ' ex τ} → Σ' ⊢ ex :· τ → ex ex-complete
-  ex-ta-complete (TATpl ∥exs⊫=∥τs∥ h) = EXCTpl (λ {i} i<∥exs∥ → ex-ta-complete (h i<∥exs∥ (tr (λ y → i < y) ∥exs⊫=∥τs∥ i<∥exs∥)))
-  ex-ta-complete (TACtor _ _ ta) = EXCCtor (ex-ta-complete ta)
-  ex-ta-complete {ex = PF pf} (TAPF h) =
-    EXCPF (PFC λ i<∥pf∥ →
-               λ where refl →
-                         let (rval , rta , exta) = h i<∥pf∥ refl in
-                         values-complete rval , ex-ta-complete exta)
+  ex-ta-complete = ex-values-complete ⊙ ex-ta-value
 
   -- any hole is new to a complete expression
   e-complete-hnn : ∀{e u} → e ecomplete → hole-name-new e u
@@ -101,14 +94,14 @@ module completeness where
         i<∥τs∥ = tr< ∥es⊫=∥τs∥ i<∥es∥
       in
       eval-completeness Ecmp Γ⊢E (tas i<∥es∥ i<∥τs∥) (evals i<∥es∥ i<∥rs∥ i<∥ks∥) (cmps i<∥es∥)
-  eval-completeness Ecmp Γ⊢E (TAGet ∥rs⊫=∥τs∥ i<∥τs∥ ta) (EGet i<∥rs∥ eval) (ECGet ecmp)
+  eval-completeness Ecmp Γ⊢E (TAGet ∥rs⊫=∥τs∥ i<∥τs∥ ta) (EGet _ i<∥rs∥ eval) (ECGet ecmp)
     with eval-completeness Ecmp Γ⊢E ta eval ecmp
   ... | RCTpl h = h i<∥rs∥
   eval-completeness Ecmp Γ⊢E (TAGet _ i<∥τs∥ ta) (EGetUnfinished eval _) (ECGet ecmp) =
     RCGet (eval-completeness Ecmp Γ⊢E ta eval ecmp)
   eval-completeness Ecmp Γ⊢E (TACtor _ _ ta) (ECtor eval) (ECCtor ecmp) =
     RCCtor (eval-completeness Ecmp Γ⊢E ta eval ecmp)
-  eval-completeness {Σ' = Σ'} (ENVC Ecmp) Γ⊢E (TACase d∈Σ'1 ta h1 h2) (EMatch {E = E} {xc = xc} {r' = r'} form eval eval-ec) (ECCase ecmp rules-cmp)
+  eval-completeness {Σ' = Σ'} (ENVC Ecmp) Γ⊢E (TACase d∈Σ'1 ta h1 h2) (EMatch {E = E} {xc = xc} {r' = r'} CF∞ form eval eval-ec) (ECCase ecmp rules-cmp)
     with h2 form
   ... | _ , _ , _ , _ , c∈cctx1 , ta-ec
     with preservation Γ⊢E ta eval
@@ -125,6 +118,6 @@ module completeness where
   eval-completeness Ecmp Γ⊢E (TACase _ ta _ _) (EMatchUnfinished eval _) (ECCase ecmp rulescmp) =
     RCCase Ecmp (eval-completeness Ecmp Γ⊢E ta eval ecmp) rulescmp
   eval-completeness Ecmp Γ⊢E (TAHole _) EHole ()
-  eval-completeness Ecmp Γ⊢E (TAPF _) () ecmp
+  eval-completeness Ecmp Γ⊢E (TAPF _) EPF (ECPF pf-cmp) = RCPF pf-cmp
   eval-completeness Ecmp Γ⊢E (TAAsrt _ _ _) (EAsrt _ _ _) (ECAsrt _ _) =
     RCTpl (λ i<∥rs∥ → abort (n≮0 i<∥rs∥))

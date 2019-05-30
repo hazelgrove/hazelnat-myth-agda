@@ -397,6 +397,8 @@ module core where
   --   but the judgment will not go through unless evaluation eventually terminates.
   -- - If ⌊ ⛽ ⌋ is ⛽⟨ n ⟩, then the beta reduction limit is at most n,
   --   but if the limit is reached, the judgment will go through automatically.
+  -- - Note that I'm using the term "beta reduction" a little loosely, as case
+  --   evaluation also counts
   data _⊢_⌊_⌋⇒_⊣_ : env → exp → Fuel → result → constraints → Set where
     EFun             : ∀{E ⛽ x e} → E ⊢ ·λ x => e ⌊ ⛽ ⌋⇒ [ E ]λ x => e ⊣ []
     EFix             : ∀{E ⛽ f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
@@ -434,29 +436,32 @@ module core where
                          (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
                          E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
                          E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ k1 ++ k2
-    EGet             : ∀{E ⛽ i e rs k} →
+    EGet             : ∀{E ⛽ i n e rs k} →
+                         n == ∥ rs ∥ →
                          (h : i < ∥ rs ∥) →
                          E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ rs ⟩ ⊣ k →
-                         E ⊢ get[ i th-of ∥ rs ∥ ] e ⌊ ⛽ ⌋⇒ (rs ⟦ i given h ⟧) ⊣ k
+                         E ⊢ get[ i th-of n ] e ⌊ ⛽ ⌋⇒ (rs ⟦ i given h ⟧) ⊣ k
     EGetUnfinished   : ∀{E ⛽ i n e r k} →
                          E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
                          (∀{rs} → r ≠ ⟨ rs ⟩) →
                          E ⊢ get[ i th-of n ] e ⌊ ⛽ ⌋⇒ (get[ i th-of n ] r) ⊣ k
-    EMatch           : ∀{E ⛽ e rules c xc ec r' k' r k} →
+    EMatch           : ∀{E ⛽ ⛽↓ e rules c xc ec r' k' r k} →
+                         ⛽ ⛽⇓ ⛽↓ →
                          (c , |C xc => ec) ∈ rules →
                          E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
-                         (E ,, (xc , r')) ⊢ ec ⌊ ⛽ ⌋⇒ r ⊣ k →
+                         (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒ r ⊣ k →
                          E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ r ⊣ k' ++ k
     EMatchUnfinished : ∀{E ⛽ e rules r k} →
                          E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
                          (∀{c e'} → r ≠ (C[ c ] e')) →
                          E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
+    EPF              : ∀{E ⛽ pf} → (E ⊢ PF pf ⌊ ⛽ ⌋⇒ PF pf ⊣ [])
     EAsrt            : ∀{E ⛽ e1 r1 k1 e2 r2 k2 k3} →
                          E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
                          E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
                          Constraints⦃ r1 , r2 ⦄:= k3 →
                          E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒ ⟨ [] ⟩ ⊣ k1 ++ k2 ++ k3
-    EDepthLimit      : ∀{E e r} → E ⊢ e ⌊ ⛽⟨ 0 ⟩ ⌋⇒ r ⊣ []
+    ELimit           : ∀{E e r} → E ⊢ e ⌊ ⛽⟨ 0 ⟩ ⌋⇒ r ⊣ []
 
   -- Big step evaluation - the ordinary variety with no beta reduction counting or limit
   _⊢_⇒_⊣_ : env → exp → result → constraints → Set
@@ -497,11 +502,18 @@ module core where
     EFMatchScrut : ∀{E ⛽ e rules} →
                      E ⊢ e ⌊ ⛽ ⌋⇒∅ →
                      E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
-    EFMatchRule  : ∀{E ⛽ e rules c xc ec r' k'} →
+    EFMatchRule  : ∀{E ⛽ ⛽↓ e rules c xc ec r' k'} →
+                     ⛽ ⛽⇓ ⛽↓ →
                      (c , |C xc => ec) ∈ rules →
                      E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
-                     (E ,, (xc , r')) ⊢ ec ⌊ ⛽ ⌋⇒∅ →
+                     (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒∅ →
                      E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
+    EFAsrtL      : ∀{E ⛽ e1 e2} →
+                     E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
+    EFAsrtR      : ∀{E ⛽ e1 e2} →
+                     E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
+                     E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
     EFAsrt       : ∀{E ⛽ e1 r1 k1 e2 r2 k2} →
                      E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
                      E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
@@ -512,7 +524,6 @@ module core where
   _⊢_⇒∅ : env → exp → Set
   E ⊢ e ⇒∅ = E ⊢ e ⌊ ∞ ⌋⇒∅
 
-  -- TODO actually use _⊢_⇒∅ when doing progress
   -- TODO we'll need some theorems for group
   -- TODO also theorems for everything below, including synthesis and solve
   group : constraints → worlds ctx

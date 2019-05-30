@@ -5,6 +5,7 @@ open import List
 open import contexts
 open import core
 
+open import results-checks
 open import preservation
 
 module finality where
@@ -54,12 +55,12 @@ module finality where
         i<∥τs∥ = tr< h i<∥es∥
       in
       finality E-final ctxcons (h3 i<∥es∥ i<∥τs∥) (h6 i<∥es∥ i<∥rs∥ i<∥ks∥)
-  finality E-final ctxcons (TAGet ∥rs⊫=∥τs∥ i<∥τs∥ ta) (EGet h eval)
+  finality E-final ctxcons (TAGet ∥rs⊫=∥τs∥ i<∥τs∥ ta) (EGet _ h eval)
     with finality E-final ctxcons ta eval
   ... | FTpl all-fin = all-fin h
   finality E-final ctxcons (TAGet h i<∥τs∥ ta) (EGetUnfinished eval h2) = FGet (finality E-final ctxcons ta eval) h2
   finality E-final ctxcons (TACtor h h2 ta) (ECtor eval) = FCon (finality E-final ctxcons ta eval)
-  finality {Σ' = Σ'} (EF E-fin) ctxcons (TACase d∈Σ'1 ta h1 h2) (EMatch {E = E} {xc = xc} {r' = r'} form eval eval-ec)
+  finality {Σ' = Σ'} (EF E-fin) ctxcons (TACase d∈Σ'1 ta h1 h2) (EMatch {E = E} {xc = xc} {r' = r'} CF∞ form eval eval-ec)
     with h2 form
   ...  | _ , _ , _ , _ , c∈cctx1 , ta-ec
     with preservation ctxcons ta eval
@@ -74,5 +75,7 @@ module finality where
         ... | FCon r'-fin = r'-fin
   finality E-final ctxcons (TACase h ta h2 h3) (EMatchUnfinished eval h4) = FCase (finality E-final ctxcons ta eval) h4 E-final
   finality E-final ctxcons (TAHole _) EHole = FHole E-final
-  finality E-final ctxcons (TAPF _) ()
+  finality E-final ctxcons (TAPF ta) EPF
+    with ex-ta-value ta
+  ... | EXVPF pf-val = FPF (pf-value-final pf-val)
   finality E-final ctxcons (TAAsrt _ _ _) (EAsrt _ _ _) = FTpl (λ i<∥rs∥ → abort (n≮0 i<∥rs∥))

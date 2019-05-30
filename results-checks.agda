@@ -52,6 +52,18 @@ module results-checks where
     ex-values-final (EXVTpl h) = EXFTpl λ i<∥exs∥ → ex-values-final (h i<∥exs∥)
     ex-values-final (EXVCtor ex-val) = EXFCtor (ex-values-final ex-val)
 
+    -- if an example type-checks, it's a value
+    ex-ta-value : ∀{Σ' ex τ} → Σ' ⊢ ex :· τ → ex ex-value
+    ex-ta-value (TATpl ∥exs⊫=∥τs∥ h) = EXVTpl (λ {i} i<∥exs∥ → ex-ta-value (h i<∥exs∥ (tr (λ y → i < y) ∥exs⊫=∥τs∥ i<∥exs∥)))
+    ex-ta-value (TACtor _ _ ta) = EXVCtor (ex-ta-value ta)
+    ex-ta-value {ex = PF pf} (TAPF h) =
+      EXVPF (PFV λ i<∥pf∥ →
+                 λ where refl →
+                           let (rval , rta , exta) = h i<∥pf∥ refl in
+                           rval , ex-ta-value exta)
+
+    -- pf-ta-value : ∀{Σ' pf τ} → Σ' ⊢ ex :· τ → ex ex-value
+
   {- TODO : not currently true because pf ∘ blah is complete and final but not a value
   -- all complete finals (that type-check) are values
   mutual

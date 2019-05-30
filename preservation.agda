@@ -31,10 +31,10 @@ module preservation where
     preservation (EnvInd (EnvInd ctxcons-Ef (preservation ctxcons ta-f eval1)) (preservation ctxcons ta-arg eval2)) ta-ef eval-ef
   preservation ctxcons (TAApp _ ta1 ta2) (EAppUnfinished eval1 _ _ eval2) =
     TAApp (preservation ctxcons ta1 eval1) (preservation ctxcons ta2 eval2)
-  preservation ctxcons (TAGet _ i<∥τs∥ ta) (EGet h eval) with preservation ctxcons ta eval
+  preservation ctxcons (TAGet _ i<∥τs∥ ta) (EGet _ h eval) with preservation ctxcons ta eval
   ... | TATpl _ h' = h' h i<∥τs∥
   preservation ctxcons (TAGet n==∥τs∥ i<∥τs∥ ta) (EGetUnfinished eval h) rewrite n==∥τs∥ = TAGet i<∥τs∥ (preservation ctxcons ta eval)
-  preservation {Σ' = Σ'} ctxcons (TACase d∈Σ' ta h1 h2) (EMatch form eval-e eval-ec) with h2 form
+  preservation {Σ' = Σ'} ctxcons (TACase d∈Σ' ta h1 h2) (EMatch CF∞ form eval-e eval-ec) with h2 form
   ... | _ , _ , _ , _ , c∈cctx2 , ta-ec with preservation ctxcons ta eval-e
   ... | TACtor {cctx = cctx} d∈Σ'2 c∈cctx ta' with ctxunicity {Γ = π1 Σ'} d∈Σ' d∈Σ'2
   ... | refl with ctxunicity {Γ = cctx} c∈cctx c∈cctx2
@@ -43,4 +43,5 @@ module preservation where
     TACase d∈Σ' ctxcons (preservation ctxcons ta eval) h1 λ form' →
       let p1 , _ , _ , _ , p2 , p3 = h2 form' in
       p1 , _ , p2 , p3
+  preservation ctxcons (TAPF ta) EPF = TAPF ta
   preservation ctxcons (TAAsrt _ ta1 ta2) (EAsrt eval1 eval2 _) = TATpl refl λ i<∥rs∥ → abort (n≮0 i<∥rs∥)

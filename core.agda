@@ -193,7 +193,7 @@ module core where
                     (i<∥τs∥ : i < ∥ τs ∥) →
                     Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)) →
                  Δ , Σ' , Γ ⊢ ⟨ es ⟩ :: ⟨ τs ⟩
-      TAGet  : ∀{Δ Σ' Γ i e n τs} →
+      TAGet  : ∀{Δ Σ' Γ i n e τs} →
                  n == ∥ τs ∥ → -- this awkwardness is necessary to permit unification
                  (i<∥τs∥ : i < ∥ τs ∥) →
                  Δ , Σ' , Γ ⊢ e :: ⟨ τs ⟩ →
@@ -326,7 +326,7 @@ module core where
                  (d , cctx) ∈ π1 Σ' →
                  Δ , Σ' , Γ ⊢ E →
                  Δ , Σ' ⊢ r ·: D[ d ] →
-                 -- There must be a rule for each constructor, i.e. case exhuastiveness
+                 -- There must be a rule for each constructor, i.e. case exhaustiveness
                  (∀{c} → dom cctx c → dom rules c) →
                  (∀{c xc ec} →
                     (c , |C xc => ec) ∈ rules →

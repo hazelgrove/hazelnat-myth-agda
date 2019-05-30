@@ -86,3 +86,7 @@ module Prelude where
   -- non-equality is commutative
   flip : {A : Set} {x y : A} → (x == y → ⊥) → (y == x → ⊥)
   flip neq eq = neq (! eq)
+
+  -- function composition
+  _⊙_ : {A B C : Set} → (B → C) → (A → B) → A → C
+  _⊙_ f g x = f (g x)

@@ -575,29 +575,34 @@ module core where
                  W == map (λ {(E , ex) → (E , C[ c ] ex)}) W' →
                  Σ' , Γ , W' ⊢ τ ↑ e →
                  Σ' , Γ , W ⊢ D[ d ] ↑ (C[ c ] e)
-      IRTpl : ∀{Σ' Γ W τs es} →
-                ∥ τs ∥ == ∥ es ∥ →
-                -- The example in each world of W must be a tuple of size ∥ τs ∥
+      IRTpl : ∀{Σ' Γ n m W Es exs τs es} →
+                n == ∥ es ∥ →
+                n == ∥ τs ∥ →
+                m == ∥ W ∥ →
+                m == ∥ Es ∥ →
+                m == ∥ exs ∥ →
+                (∀{j} →
+                   (j<∥exs∥ : j < ∥ exs ∥) →
+                   n == ∥ exs ⟦ j given j<∥exs∥ ⟧ ∥) →
                 (∀{j} →
                    (j<∥W∥ : j < ∥ W ∥) →
-                   Σ[ exs ∈ List ex ] (
-                      ⟨ exs ⟩ == π2 (W ⟦ j given j<∥W∥ ⟧) ∧
-                      ∥ τs ∥ == ∥ exs ∥)) →
-                -- For each index i in the example tuples and the type tuple,
-                -- there must be a W' composed of the examples indexed by i,
-                -- under which the ith type must synthesize the ith result
+                   (j<∥Es∥ : j < ∥ Es ∥) →
+                   (j<∥exs∥ : j < ∥ exs ∥) →
+                   W ⟦ j given j<∥W∥ ⟧ == (Es ⟦ j given j<∥Es∥ ⟧ , ⟨ exs ⟦ j given j<∥exs∥ ⟧ ⟩)) →
                 (∀{i} →
                    (i<∥τs∥ : i < ∥ τs ∥) →
                    (i<∥es∥ : i < ∥ es ∥) →
-                   Σ[ W' ∈ worlds ] (
-                      ∥ W ∥ == ∥ W' ∥ ∧
-                      (∀{j E exs} →
-                         (j<∥W∥ : j < ∥ W ∥) →
-                         (j<∥W'∥ : j < ∥ W' ∥) →
-                         (E , ⟨ exs ⟩) == W ⟦ j given j<∥W∥ ⟧ →
-                         (i<∥exs∥ : i < ∥ exs ∥) →
-                         W' ⟦ j given j<∥W'∥ ⟧ == (E , exs ⟦ i given i<∥exs∥ ⟧)) ∧
-                      Σ' , Γ , W' ⊢ τs ⟦ i given i<∥τs∥ ⟧ ↑ (es ⟦ i given i<∥es∥ ⟧))) →
+                   Σ[ Wi ∈ worlds ] (
+                      (m == ∥ Wi ∥)
+                        ∧
+                      (∀{j} →
+                         (j<∥Wi∥ : j < ∥ Wi ∥) →
+                         (j<∥Es∥ : j < ∥ Es ∥) →
+                         (j<∥exs∥ : j < ∥ exs ∥) →
+                         (i<∥exsj∥ : i < ∥ exs ⟦ j given j<∥exs∥ ⟧ ∥) →
+                         Wi ⟦ j given j<∥Wi∥ ⟧ == (Es ⟦ j given j<∥Es∥ ⟧ , exs ⟦ j given j<∥exs∥ ⟧ ⟦ i given i<∥exsj∥ ⟧))
+                        ∧
+                      (Σ' , Γ , Wi ⊢ τs ⟦ i given i<∥τs∥ ⟧ ↑ (es ⟦ i given i<∥es∥ ⟧)))) →
                 Σ' , Γ , W ⊢ ⟨ τs ⟩ ↑ ⟨ es ⟩
       IRLam : ∀{Σ' Γ W W' τ1 τ2 ⦇E,pf⦈s x e} →
                 ∥ ⦇E,pf⦈s ∥ == ∥ W ∥ →

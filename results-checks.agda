@@ -62,6 +62,7 @@ module results-checks where
           let (rval , rta , exta) = h pf[i]==v,ex in
           rval , (ex-ta-value exta))
 
+  -- TODO what is this? Probably delete
     -- pf-ta-value : ∀{Σ' pf τ} → Σ' ⊢ ex :· τ → ex ex-value
 
   {- TODO : not currently true because pf ∘ blah is complete and final but not a value

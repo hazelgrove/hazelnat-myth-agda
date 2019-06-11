@@ -22,17 +22,23 @@ module constraints-checks where
   constraints-unicity XCExRefl (XCGet ne _) = abort (ne refl)
   constraints-unicity XCExRefl (XCMatch ne _) = abort (ne refl)
   constraints-unicity (XCTpl ne _ _ _) XCExRefl = abort (ne refl)
-  constraints-unicity (XCTpl {ks = ks1} _ ∥rs1⊫=∥rs2∥ ∥rs1⊫=∥ks1∥ h1) (XCTpl {ks = ks2} _ _ ∥rs1⊫=∥ks2∥ h2)
-    rewrite
-      ==comm
-        (! ∥rs1⊫=∥ks1∥ · ∥rs1⊫=∥ks2∥)
-        (λ {i} i<∥l1∥ i<∥l2∥ →
-           let
-             i<∥rs1∥ = tr (λ y → i < y) (! ∥rs1⊫=∥ks1∥) i<∥l1∥
-             i<∥rs2∥ = tr (λ y → i < y) ∥rs1⊫=∥rs2∥ i<∥rs1∥
-           in
-           constraints-unicity (h1 i<∥rs1∥ i<∥rs2∥ i<∥l1∥) (h2 i<∥rs1∥ i<∥rs2∥ i<∥l2∥))
-    = refl
+  constraints-unicity (XCTpl {rs1} {rs2} {ks1} _ ∥rs1∥==∥rs2∥ ∥rs1∥==∥ks1∥ h1) (XCTpl {ks = ks2} _ _ ∥rs1∥==∥ks2∥ h2)
+    with ==-per-elem {l1 = ks1} {ks2} per-elem
+         where
+         per-elem : (i : Nat) → ks1 ⟦ i ⟧ == ks2 ⟦ i ⟧
+         per-elem i
+           with list-index-dec rs1 i
+         ... | Inl rs1[i]==None
+           rewrite ∥l1∥==∥l2∥→¬l1[i]→¬l2[i] ∥rs1∥==∥ks2∥ rs1[i]==None
+             = ∥l1∥==∥l2∥→¬l1[i]→¬l2[i] ∥rs1∥==∥ks1∥ rs1[i]==None
+         ... | Inr (_ , rs1[i]==r1-i)
+           with ∥l1∥==∥l2∥→l1[i]→l2[i] ∥rs1∥==∥rs2∥ rs1[i]==r1-i
+              | ∥l1∥==∥l2∥→l1[i]→l2[i] ∥rs1∥==∥ks1∥ rs1[i]==r1-i
+              | ∥l1∥==∥l2∥→l1[i]→l2[i] ∥rs1∥==∥ks2∥ rs1[i]==r1-i
+         ...  | _ , rs2[i]==r2-i | _ , ks1[i]==k1-i | _ , ks2[i]==k2-i
+           with constraints-unicity (h1 rs1[i]==r1-i rs2[i]==r2-i ks1[i]==k1-i) (h2 rs1[i]==r1-i rs2[i]==r2-i ks2[i]==k2-i)
+         ... | refl rewrite ks2[i]==k2-i = ks1[i]==k1-i
+  ... | refl = refl
   constraints-unicity (XCCTor ne _) XCExRefl = abort (ne refl)
   constraints-unicity (XCCTor _ :=k) (XCCTor _ :=k') = constraints-unicity :=k :=k'
   constraints-unicity (XCAp ne _ _) XCExRefl = abort (ne refl)
@@ -63,10 +69,11 @@ module constraints-checks where
       with list<constraints>-dec ∥rs1∥==∥rs2∥
     ... | Inl (_ , ∥rs1∥==∥ks∥ , C<children>)
             = Inl (_ , XCTpl r1≠r2 ∥rs1∥==∥rs2∥ ∥rs1∥==∥ks∥ C<children>)
-    ... | Inr (i , i<∥rs1∥ , i<∥rs2∥ , cf) = Inr λ
+    ... | Inr (i , _ , _ , i<∥rs1∥ , i<∥rs2∥ , cf) = Inr λ
             { (_ , XCExRefl) → r1≠r2 refl ;
               (_ , XCTpl {ks = ks} _ _ ∥rs1∥==∥ks∥ C<children>) →
-                 cf (_ , C<children> i<∥rs1∥ i<∥rs2∥ (tr (λ y → i < y) ∥rs1∥==∥ks∥ i<∥rs1∥))
+                let _ , i<∥ks∥ = ∥l1∥==∥l2∥→l1[i]→l2[i] ∥rs1∥==∥ks∥ i<∥rs1∥ in
+                cf (_ , C<children> i<∥rs1∥ i<∥rs2∥ i<∥ks∥)
             }
     constraints-dec ⟨ rs1 ⟩ ([ x ]λ x₁ => x₂) | Inr r1≠r2 = Inr (λ where (_ , ()))
     constraints-dec ⟨ rs1 ⟩ [ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ | Inr r1≠r2 = Inr (λ where (_ , ()))
@@ -186,50 +193,35 @@ module constraints-checks where
                               ∥ rs1 ∥ == ∥ rs2 ∥ →
                               Σ[ ks ∈ List constraints ]
                                  ( ∥ rs1 ∥ == ∥ ks ∥ ∧
-                                   (∀{i} →
-                                      (i<∥rs1∥ : i < ∥ rs1 ∥) →
-                                      (i<∥rs2∥ : i < ∥ rs2 ∥) →
-                                      (i<∥ks∥ : i < ∥ ks ∥) →
-                                      Constraints⦃ rs1 ⟦ i given i<∥rs1∥ ⟧ , rs2 ⟦ i given i<∥rs2∥ ⟧ ⦄:= (ks ⟦ i given i<∥ks∥ ⟧))
+                                   (∀{i r1-i r2-i k-i} →
+                                      rs1 ⟦ i ⟧ == Some r1-i →
+                                      rs2 ⟦ i ⟧ == Some r2-i →
+                                      ks  ⟦ i ⟧ == Some k-i →
+                                      Constraints⦃ r1-i , r2-i ⦄:= k-i)
                                  ) ∨
-                              Σ[ i ∈ Nat ] Σ[ i<∥rs1∥ ∈ i < ∥ rs1 ∥ ] Σ[ i<∥rs2∥ ∈ i < ∥ rs2 ∥ ]
-                                 Constraints⦃ rs1 ⟦ i given i<∥rs1∥ ⟧ , rs2 ⟦ i given i<∥rs2∥ ⟧ ⦄:=∅
-    list<constraints>-dec {[]} {[]} ∥rs1∥==∥rs2∥
-      = Inl (_ , ∥rs1∥==∥rs2∥ , λ i<∥rs1∥ i<∥rs2∥ i<∥ks∥ → abort (n≮0 i<∥rs1∥))
+                              Σ[ i ∈ Nat ] Σ[ r1-i ∈ result ] Σ[ r2-i ∈ result ] (
+                                 rs1 ⟦ i ⟧ == Some r1-i ∧
+                                 rs2 ⟦ i ⟧ == Some r2-i ∧
+                                 Constraints⦃ r1-i , r2-i ⦄:=∅)
+    list<constraints>-dec {[]} {[]} ∥rs1∥==∥rs2∥ = Inl (_ , ∥rs1∥==∥rs2∥ , λ ())
     list<constraints>-dec {[]} {_ :: _} ()
     list<constraints>-dec {_ :: _} {[]} ()
     list<constraints>-dec {h1 :: t1} {h2 :: t2} ∥rs1∥==∥rs2∥
       with constraints-dec h1 h2
-    ... | Inr cf
-            = Inr (Z , 0<1+n , 0<1+n , λ {(_ , C<h1,h2>) → cf (_ , C<h1,h2>)})
+    ... | Inr cf = Inr (Z , h1 , h2 , refl , refl , λ {(_ , C<h1,h2>) → cf (_ , C<h1,h2>)})
     ... | Inl (hks , C<h1,h2>)
       with list<constraints>-dec {t1} {t2} (1+inj ∥rs1∥==∥rs2∥)
-    ... | Inl (tks , ∥t1∥==∥ks∥ , C<t1,t2>)
-            = Inl ((hks :: tks) , 1+ap ∥t1∥==∥ks∥ , ap-C<t1,t2>)
+    ... | Inl (tks , ∥t1∥==∥tks∥ , C<t1,t2>)
+            = Inl ((hks :: tks) , 1+ap ∥t1∥==∥tks∥ , λ {i} → ap-C<t1,t2> {i}) -- ← wtf?
               where
-              ap-C<t1,t2> : ∀{i} →
-                              (i<∥rs1∥ : i < 1+ ∥ t1 ∥) →
-                              (i<∥rs2∥ : i < 1+ ∥ t2 ∥) →
-                              (i<∥ks∥ : i < ∥ hks :: tks ∥) →
-                              Constraints⦃
-                                (h1 :: t1) ⟦ i given i<∥rs1∥ ⟧ ,
-                                (h2 :: t2) ⟦ i given i<∥rs2∥ ⟧
-                              ⦄:= ((hks :: tks) ⟦ i given i<∥ks∥ ⟧)
-              ap-C<t1,t2> {Z} i<∥rs1∥ i<∥rs2∥ i<∥ks∥ = C<h1,h2>
-              ap-C<t1,t2> {1+ i} i<∥rs1∥ i<∥rs2∥ i<∥ks∥
-                = C<t1,t2> (1+n<1+m→n<m i<∥rs1∥) (1+n<1+m→n<m i<∥rs2∥) (1+n<1+m→n<m i<∥ks∥)
-    ... | Inr (j , j<∥t1∥ , j<∥t2∥ , cf)
-            = Inr (1+ j , n<m→1+n<1+m j<∥t1∥ , n<m→1+n<1+m j<∥t2∥ , ap-cf)
-              where
-                ap-cf :
-                  Σ[ wc ∈ world ctx ]
-                     Constraints⦃
-                       t1 ⟦ j given 1+n<1+m→n<m (n<m→1+n<1+m j<∥t1∥) ⟧ ,
-                       t2 ⟦ j given 1+n<1+m→n<m (n<m→1+n<1+m j<∥t2∥) ⟧
-                     ⦄:= wc
-                  → ⊥
-                ap-cf (_ , C<t1,t2>)
-                  rewrite
-                      index-proof-irrelevance {p1 = 1+n<1+m→n<m (n<m→1+n<1+m j<∥t1∥)} {j<∥t1∥}
-                    | index-proof-irrelevance {p1 = 1+n<1+m→n<m (n<m→1+n<1+m j<∥t2∥)} {j<∥t2∥}
-                        = cf (_ , C<t1,t2>)
+              ap-C<t1,t2> : ∀{i r1-i r2-i k-i} →
+                              (h1 :: t1)   ⟦ i ⟧ == Some r1-i →
+                              (h2 :: t2)   ⟦ i ⟧ == Some r2-i →
+                              (hks :: tks) ⟦ i ⟧ == Some k-i →
+                              Constraints⦃ r1-i , r2-i ⦄:= k-i
+              ap-C<t1,t2> {Z}    rs1[i] rs2[i] ks[i]
+                rewrite someinj rs1[i] | someinj rs2[i] | someinj ks[i]
+                  = C<h1,h2>
+              ap-C<t1,t2> {1+ i} rs1[i] rs2[i] ks[i]
+                = C<t1,t2> rs1[i] rs2[i] ks[i]
+    ... | Inr (j , j<∥t1∥ , j<∥t2∥ , h₁ , h₂ , cf) = Inr (1+ j , _ , _ , h₁ , h₂ , cf)

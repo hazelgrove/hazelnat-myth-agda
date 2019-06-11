@@ -74,22 +74,23 @@ module progress where
     with lemma-progress-tpl {n = 1+ n} Γ⊢E ta
   ... | Inr tpl-fails                    = Inr tpl-fails
   ... | Inl (_ , _ , tpl-evals , ta-tpl) = Inl (_ , _ , tpl-evals , ta-tpl)
-  progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TAGet {i = i} {len} {e} len==∥τs∥ i<∥τs∥ ta)
+  progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TAGet {i = i} {len} {e} len==∥τs∥ τs[i] ta)
     with progress Γ⊢E ta
   ... | Inr e-fails = Inr (EFGet e-fails)
   ... | Inl (⟨ rs ⟩ , _ , e-evals , TATpl ∥rs∥==∥τs∥ tas)
-          = let i<∥rs∥ = tr (λ y → i < y) (! ∥rs∥==∥τs∥) i<∥τs∥ in
-            Inl (_ , _ , EGet (len==∥τs∥ · ! ∥rs∥==∥τs∥) i<∥rs∥ e-evals , tas i<∥rs∥ i<∥τs∥)
+          rewrite len==∥τs∥
+            = let _ , rs[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] (! ∥rs∥==∥τs∥) τs[i] in
+              Inl (_ , _ , EGet (! ∥rs∥==∥τs∥) rs[i] e-evals , tas rs[i] τs[i])
   ... | Inl (([ x ]λ x₁ => x₂) , _ , e-evals , TALam _ ())
   ... | Inl ([ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ , _ , e-evals , TAFix _ ())
   ... | Inl ([ x ]??[ x₁ ] , _ , e-evals , r-ta)
-          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet i<∥τs∥ r-ta)
+          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet τs[i] r-ta)
   ... | Inl ((r ∘ r₁) , _ , e-evals , r-ta)
-          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet i<∥τs∥ r-ta)
+          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet τs[i] r-ta)
   ... | Inl ((get[ x th-of x₁ ] r) , _ , e-evals , r-ta)
-          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet i<∥τs∥ r-ta)
+          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet τs[i] r-ta)
   ... | Inl ([ x ]case r of⦃· x₁ ·⦄ , _ , e-evals , r-ta)
-          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet i<∥τs∥ r-ta)
+          rewrite len==∥τs∥ = Inl (_ , _ , EGetUnfinished e-evals (λ ()) , TAGet τs[i] r-ta)
   ... | Inl (PF _ , _ , e-evals , TAPF ())
   progress {n = 1+ n} Γ⊢E (TACtor d∈Σ' c∈d ta)
     with progress Γ⊢E ta
@@ -137,45 +138,45 @@ module progress where
   ... | Inr e2-fails = Inr (EFAsrtR e2-fails)
   ... | Inl (r2 , _ , e2-evals , ta-r2)
     with constraints-dec r1 r2
-  ... | Inl (_ , c-succ) = Inl (_ , _ , EAsrt e1-evals e2-evals c-succ , TATpl refl (λ i<∥rs∥ i<∥τs∥ → abort (n≮0 i<∥τs∥)))
+  ... | Inl (_ , c-succ) = Inl (_ , _ , EAsrt e1-evals e2-evals c-succ , TATpl refl (λ ()))
   ... | Inr c-fail       = Inr (EFAsrt e1-evals e2-evals c-fail)
 
   lemma-progress-tpl {es = []} {[]} Γ⊢E ta
-    = Inl (_ , _ , ETuple refl refl (λ i<∥es∥ i<∥rs∥ i<∥ks∥ → abort (n≮0 i<∥es∥)) , TATpl refl (λ i<∥rs∥ i<∥τs∥ → abort (n≮0 i<∥τs∥)))
+    = Inl (_ , _ , ETuple refl refl (λ ()) , TATpl refl (λ ()))
   lemma-progress-tpl {es = []} {_ :: τs} Γ⊢E (TATpl () _ _)
   lemma-progress-tpl {es = _ :: es} {[]} Γ⊢E (TATpl () _ _)
   lemma-progress-tpl {Δ} {Σ'} {Γ} {E} {es = e :: es} {τ :: τs} {0} Γ⊢E ta'
     with typ-inhabitance-pres-tpl Γ⊢E ta'
   ... | _ , ta = Inl (_ , _ , ELimit , ta)
   lemma-progress-tpl {Δ} {Σ'} {Γ} {E} {es = e :: es} {τ :: τs} {1+ n} Γ⊢E (TATpl ∥es∥==∥τs∥ hh h)
-    with progress {e = e} {n = 1+ n} Γ⊢E (h 0<1+n 0<1+n)
-  ... | Inr h-fails = Inr (EFTpl 0<1+n h-fails)
-  ... | Inl (r , _ , h-evals , ta-h)
-    with lemma-progress-tpl {n = 1+ n} Γ⊢E (TATpl (1+inj ∥es∥==∥τs∥) hh' h')
-         where
-           hh' : {i j : Nat} (i<∥es∥ : i < ∥ es ∥) (j<∥es∥ : j < ∥ es ∥) → i ≠ j → holes-disjoint (es ⟦ i given i<∥es∥ ⟧) (es ⟦ j given j<∥es∥ ⟧)
-           hh' i<∥es∥ j<∥es∥ i≠j
-             rewrite index-proof-irrelevance {p1 = i<∥es∥} {1+n<1+m→n<m (n<m→1+n<1+m i<∥es∥)}
-                   | index-proof-irrelevance {p1 = j<∥es∥} {1+n<1+m→n<m (n<m→1+n<1+m j<∥es∥)}
-               = hh (n<m→1+n<1+m i<∥es∥) (n<m→1+n<1+m j<∥es∥) (1+inj-cp i≠j)
-           h' : {i : Nat} (i<∥es∥ : i < ∥ es ∥) (i<∥τs∥ : i < ∥ τs ∥) → Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)
-           h' i<∥es∥ i<∥τs∥
-             rewrite index-proof-irrelevance {p1 = i<∥es∥} {1+n<1+m→n<m (n<m→1+n<1+m i<∥es∥)}
-                   | index-proof-irrelevance {p1 = i<∥τs∥} {1+n<1+m→n<m (n<m→1+n<1+m i<∥τs∥)}
-               = h (n<m→1+n<1+m i<∥es∥) (n<m→1+n<1+m i<∥τs∥)
-  ... | Inr (EFTpl {j = j} j<∥es∥ fails')
-          rewrite index-proof-irrelevance {p1 = j<∥es∥} {1+n<1+m→n<m (n<m→1+n<1+m j<∥es∥)}
-            = Inr (EFTpl {j = 1+ j} (n<m→1+n<1+m j<∥es∥) fails')
-  ... | Inl (rs , _ , ETuple ∥es∥==∥rs∥ ∥es∥==∥ks∥ evals , TATpl ∥rs∥==∥τs∥ h2)
-          = Inl (
-              r :: rs ,
-              _ ,
-              ETuple (1+ap ∥es∥==∥rs∥) (1+ap ∥es∥==∥ks∥)
-                (λ { {Z}    i<∥es∥ i<∥rs∥ i<∥ks∥ → h-evals ;
-                     {1+ i} i<∥es∥ i<∥rs∥ i<∥ks∥ → evals (1+n<1+m→n<m i<∥es∥) (1+n<1+m→n<m i<∥rs∥) (1+n<1+m→n<m i<∥ks∥)}) ,
-              TATpl (1+ap ∥rs∥==∥τs∥)
-                λ { {Z}    i<∥rs∥ i<∥τs∥ → ta-h ;
-                    {1+ i} i<∥rs∥ i<∥τs∥ → h2 (1+n<1+m→n<m i<∥rs∥) (1+n<1+m→n<m i<∥τs∥)})
+    with progress {e = e} {n = 1+ n} Γ⊢E (h {Z} refl refl)
+  ... | Inr h-fails = Inr (EFTpl {j = Z} refl h-fails)
+  ... | Inl (r , k , h-evals , ta-h)
+    with lemma-progress-tpl {n = 1+ n} Γ⊢E (TATpl
+           (1+inj ∥es∥==∥τs∥)
+           (λ i≠j es[i] es[j] → hh (1+inj-cp i≠j) es[i] es[j])
+           λ {i} es[i] τs[i] → h {1+ i} es[i] τs[i])
+  ... | Inr (EFTpl {j = j} j<∥es∥ fails') = Inr (EFTpl {j = 1+ j} j<∥es∥ fails')
+  ... | Inl (rs , _ , ETuple {ks = ks} ∥es∥==∥rs∥ ∥es∥==∥ks∥ evals , TATpl ∥rs∥==∥τs∥ h2)
+          = Inl (r :: rs , _ , ETuple (1+ap ∥es∥==∥rs∥) (1+ap ∥es∥==∥ks∥) (λ {i} → f-evals {i}) , TATpl (1+ap ∥rs∥==∥τs∥) (λ {i} → f-ta {i}))
+            where
+              f-evals : ∀{i e-i r-i k-i} →
+                          (e :: es) ⟦ i ⟧ == Some e-i →
+                          (r :: rs) ⟦ i ⟧ == Some r-i →
+                          (k :: ks) ⟦ i ⟧ == Some k-i →
+                          E ⊢ e-i ⌊ ⛽⟨ 1+ n ⟩ ⌋⇒ r-i ⊣ k-i
+              f-evals {Z}    e::es[i] r::rs[i] k::ks[i]
+                rewrite someinj e::es[i] | someinj r::rs[i] | someinj k::ks[i]
+                  = h-evals
+              f-evals {1+ i} e::es[i] r::rs[i] k::ks[i] = evals e::es[i] r::rs[i] k::ks[i]
+              f-ta : ∀{i r-i τ-i} →
+                       (r :: rs) ⟦ i ⟧ == Some r-i →
+                       (τ :: τs) ⟦ i ⟧ == Some τ-i →
+                       Δ , Σ' ⊢ r-i ·: τ-i
+              f-ta {Z}    r::rs[i] τ::τs[i]
+                rewrite someinj r::rs[i] | someinj τ::τs[i]
+                  = ta-h
+              f-ta {1+ i} r::rs[i] τ::τs[i] = h2 r::rs[i] τ::τs[i]
 
 {- TODO delete - this strong version is unprovable
 module progress where

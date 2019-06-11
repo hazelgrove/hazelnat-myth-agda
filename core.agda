@@ -34,40 +34,37 @@ module core where
 
     data _ex-complete : ex → Set where
       EXCPF   : ∀{pf} → pf pf-complete → (PF pf) ex-complete
-      EXCTpl  : ∀{exs} → (∀{i} → (i<∥exs∥ : i < ∥ exs ∥) → exs ⟦ i given i<∥exs∥ ⟧ ex-complete) → ⟨ exs ⟩ ex-complete
+      EXCTpl  : ∀{exs} → (∀{i ex-i} → exs ⟦ i ⟧ == Some ex-i → ex-i ex-complete) → ⟨ exs ⟩ ex-complete
       EXCCtor : ∀{c ex} → ex ex-complete → (C[ c ] ex) ex-complete
 
     data _pf-complete : pf → Set where
       PFC : ∀{pf} →
               (∀{i r ex} →
-                 (i<∥pf∥ : i < ∥ pf ∥) →
-                 (r , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 pf ⟦ i ⟧ == Some (r , ex) →
                  r rcomplete ∧ ex ex-complete) →
               pf pf-complete
 
     data _ex-value : ex → Set where
       EXVPF   : ∀{pf} → pf pf-value → (PF pf) ex-value
-      EXVTpl  : ∀{exs} → (∀{i} → (i<∥exs∥ : i < ∥ exs ∥) → exs ⟦ i given i<∥exs∥ ⟧ ex-value) → ⟨ exs ⟩ ex-value
+      EXVTpl  : ∀{exs} → (∀{i ex-i} → exs ⟦ i ⟧ == Some ex-i → ex-i ex-value) → ⟨ exs ⟩ ex-value
       EXVCtor : ∀{c ex} → ex ex-value → (C[ c ] ex) ex-value
 
     data _pf-value : pf → Set where
       PFV : ∀{pf} →
               (∀{i v ex} →
-                 (i<∥pf∥ : i < ∥ pf ∥) →
-                 (v , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 pf ⟦ i ⟧ == Some (v , ex) →
                  v value ∧ ex ex-value) →
               pf pf-value
 
     data _ex-final : ex → Set where
       EXFPF   : ∀{pf} → pf pf-final → (PF pf) ex-final
-      EXFTpl  : ∀{exs} → (∀{i} → (i<∥exs∥ : i < ∥ exs ∥) → exs ⟦ i given i<∥exs∥ ⟧ ex-final) → ⟨ exs ⟩ ex-final
+      EXFTpl  : ∀{exs} → (∀{i ex-i} → exs ⟦ i ⟧ == Some ex-i → ex-i ex-final) → ⟨ exs ⟩ ex-final
       EXFCtor : ∀{c ex} → ex ex-final → (C[ c ] ex) ex-final
 
     data _pf-final : pf → Set where
       PFF : ∀{pf} →
               (∀{i f ex} →
-                 (i<∥pf∥ : i < ∥ pf ∥) →
-                 (f , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 pf ⟦ i ⟧ == Some (f , ex) →
                  f final ∧ ex ex-final) →
               pf pf-final
 
@@ -75,10 +72,10 @@ module core where
     data _⊢_:·_ : denv → ex → typ → Set where
       TATpl  : ∀{Σ' exs τs} →
                  ∥ exs ∥ == ∥ τs ∥ →
-                 (∀{i} →
-                    (i<∥exs∥ : i < ∥ exs ∥) →
-                    (i<∥τs∥ : i < ∥ τs ∥) →
-                    Σ' ⊢ exs ⟦ i given i<∥exs∥ ⟧ :· (τs ⟦ i given i<∥τs∥ ⟧)) →
+                 (∀{i ex-i τ-i} →
+                    exs ⟦ i ⟧ == Some ex-i →
+                    τs  ⟦ i ⟧ == Some τ-i →
+                    Σ' ⊢ ex-i :· τ-i) →
                  Σ' ⊢ ⟨ exs ⟩ :· ⟨ τs ⟩
       TACtor : ∀{Σ' d cctx c ex τ} →
                  (d , cctx) ∈ π1 Σ' →
@@ -87,8 +84,7 @@ module core where
                  Σ' ⊢ C[ c ] ex :· D[ d ]
       TAPF   : ∀{Σ' pf τ1 τ2} →
                  (∀{i v ex} →
-                    (i<∥pf∥ : i < ∥ pf ∥) →
-                    (v , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                    pf ⟦ i ⟧ == Some (v , ex) →
                     v value ∧ (∅ , Σ' ⊢ v ·: τ1) ∧ Σ' ⊢ ex :· τ2) →
                  Σ' ⊢ PF pf :· τ1 ==> τ2
 
@@ -118,7 +114,7 @@ module core where
       HNNFix  : ∀{x f e u} → hole-name-new e u → hole-name-new (fix f ⦇·λ x => e ·⦈) u
       HNNVar  : ∀{x u} → hole-name-new (X[ x ]) u
       HNNAp   : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (e1 ∘ e2) u
-      HNNTup  : ∀{es u} → (∀{i} → (h : i < ∥ es ∥) → hole-name-new (es ⟦ i given h ⟧) u) → hole-name-new ⟨ es ⟩ u
+      HNNTup  : ∀{es u} → (∀{i e-i} → es ⟦ i ⟧ == Some e-i → hole-name-new e-i u) → hole-name-new ⟨ es ⟩ u
       HNNGet  : ∀{i n e u} → hole-name-new e u → hole-name-new (get[ i th-of n ] e) u
       HNNCtor : ∀{c e u} → hole-name-new e u → hole-name-new (C[ c ] e) u
       HNNCase : ∀{e rules u} →
@@ -136,7 +132,7 @@ module core where
       HDFix  : ∀{x f e e'} → holes-disjoint e e' → holes-disjoint (fix f ⦇·λ x => e ·⦈) e'
       HDVar  : ∀{x e'} → holes-disjoint (X[ x ]) e'
       HDAp   : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (e1 ∘ e2) e'
-      HDTup  : ∀{es e'} → (∀{i} → (h : i < ∥ es ∥) → holes-disjoint (es ⟦ i given h ⟧) e') → holes-disjoint ⟨ es ⟩ e'
+      HDTup  : ∀{es e'} → (∀{i e-i} → es ⟦ i ⟧ == Some e-i → holes-disjoint e-i e') → holes-disjoint ⟨ es ⟩ e'
       HDGet  : ∀{i n e e'} → holes-disjoint e e' → holes-disjoint (get[ i th-of n ] e) e'
       HDCtor : ∀{c e e'} → holes-disjoint e e' → holes-disjoint (C[ c ] e) e'
       HDCase : ∀{e rules e'} →
@@ -154,7 +150,7 @@ module core where
       ECFix  : ∀{f x e} → e ecomplete → fix f ⦇·λ x => e ·⦈ ecomplete
       ECVar  : ∀{x} → X[ x ] ecomplete
       ECAp   : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (e1 ∘ e2) ecomplete
-      ECTpl  : ∀{es} → (∀{i} → (i<∥es∥ : i < ∥ es ∥) → es ⟦ i given i<∥es∥ ⟧ ecomplete) → ⟨ es ⟩ ecomplete
+      ECTpl  : ∀{es} → (∀{i e-i} → es ⟦ i ⟧ == Some e-i → e-i ecomplete) → ⟨ es ⟩ ecomplete
       ECGet  : ∀{i n e} → e ecomplete → (get[ i th-of n ] e) ecomplete
       ECCtor : ∀{c e} → e ecomplete → (C[ c ] e) ecomplete
       ECCase : ∀{e rules} →
@@ -183,21 +179,21 @@ module core where
                  Δ , Σ' , Γ ⊢ f ∘ arg :: τ2
       TATpl  : ∀{Δ Σ' Γ es τs} →
                  ∥ es ∥ == ∥ τs ∥ →
-                 (∀{i j} →
-                    (i<∥es∥ : i < ∥ es ∥) →
-                    (j<∥es∥ : j < ∥ es ∥) →
+                 (∀{i j e-i e-j} →
                     i ≠ j →
-                    holes-disjoint (es ⟦ i given i<∥es∥ ⟧) (es ⟦ j given j<∥es∥ ⟧)) →
-                 (∀{i} →
-                    (i<∥es∥ : i < ∥ es ∥) →
-                    (i<∥τs∥ : i < ∥ τs ∥) →
-                    Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)) →
+                    es ⟦ i ⟧ == Some e-i →
+                    es ⟦ j ⟧ == Some e-j →
+                    holes-disjoint e-i e-j) →
+                 (∀{i e-i τ-i} →
+                    es ⟦ i ⟧ == Some e-i →
+                    τs ⟦ i ⟧ == Some τ-i →
+                    Δ , Σ' , Γ ⊢ e-i :: τ-i) →
                  Δ , Σ' , Γ ⊢ ⟨ es ⟩ :: ⟨ τs ⟩
-      TAGet  : ∀{Δ Σ' Γ i n e τs} →
-                 n == ∥ τs ∥ → -- this awkwardness is necessary to permit unification
-                 (i<∥τs∥ : i < ∥ τs ∥) →
+      TAGet  : ∀{Δ Σ' Γ i n e τs τ-i} →
+                 n == ∥ τs ∥ →
+                 τs ⟦ i ⟧ == Some τ-i →
                  Δ , Σ' , Γ ⊢ e :: ⟨ τs ⟩ →
-                 Δ , Σ' , Γ ⊢ get[ i th-of n ] e :: (τs ⟦ i given i<∥τs∥ ⟧)
+                 Δ , Σ' , Γ ⊢ get[ i th-of n ] e :: τ-i
       TACtor : ∀{Δ Σ' Γ d cctx c e τ} →
                  (d , cctx) ∈ π1 Σ' →
                  (c , τ) ∈ cctx →
@@ -255,7 +251,7 @@ module core where
     data _value : result → Set where
       VLam : ∀{E x e} → E env-values → e ecomplete → ([ E ]λ x => e) value
       VFix : ∀{E f x e} → E env-values → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ value
-      VTpl : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) value) → ⟨ rs ⟩ value
+      VTpl : ∀{rs} → (∀{i r-i} → rs ⟦ i ⟧ == Some r-i → r-i value) → ⟨ rs ⟩ value
       VCon : ∀{c r} → r value → (C[ c ] r) value
       VPF  : ∀{pf} → pf pf-value → (PF pf) value
 
@@ -263,7 +259,7 @@ module core where
     data _final : result → Set where
       FLam : ∀{E x e} → E env-final → ([ E ]λ x => e) final
       FFix : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ final
-      FTpl  : ∀{rs} → (∀{i} → (h : i < ∥ rs ∥) → (rs ⟦ i given h ⟧) final) → ⟨ rs ⟩ final
+      FTpl  : ∀{rs} → (∀{i r-i} → rs ⟦ i ⟧ == Some r-i → r-i final) → ⟨ rs ⟩ final
       FCon  : ∀{c r} → r final → (C[ c ] r) final
       FHole : ∀{E u} → E env-final → [ E ]??[ u ] final
       FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
@@ -274,7 +270,7 @@ module core where
     data _rcomplete : result → Set where
       RCLam  : ∀{E x e} → E env-complete → e ecomplete → ([ E ]λ x => e) rcomplete
       RCFix  : ∀{E f x e} → E env-complete → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ rcomplete
-      RCTpl  : ∀{rs} → (∀{i} → (i<∥rs∥ : i < ∥ rs ∥) → rs ⟦ i given i<∥rs∥ ⟧ rcomplete) → ⟨ rs ⟩ rcomplete
+      RCTpl  : ∀{rs} → (∀{i r-i} → rs ⟦ i ⟧ == Some r-i → r-i rcomplete) → ⟨ rs ⟩ rcomplete
       RCCtor : ∀{c r} → r rcomplete → (C[ c ] r) rcomplete
       RCAp   : ∀{r1 r2} → r1 rcomplete → r2 rcomplete → (r1 ∘ r2) rcomplete
       RCGet  : ∀{i n r} → r rcomplete → (get[ i th-of n ] r) rcomplete
@@ -308,15 +304,15 @@ module core where
                  Δ , Σ' ⊢ f ∘ arg ·: τ2
       TATpl  : ∀{Δ Σ' rs τs} →
                  ∥ rs ∥ == ∥ τs ∥ →
-                 (∀{i} →
-                    (i<∥rs∥ : i < ∥ rs ∥) →
-                    (i<∥τs∥ : i < ∥ τs ∥) →
-                    Δ , Σ' ⊢ rs ⟦ i given i<∥rs∥ ⟧ ·: (τs ⟦ i given i<∥τs∥ ⟧)) →
+                 (∀{i r-i τ-i} →
+                    rs ⟦ i ⟧ == Some r-i →
+                    τs ⟦ i ⟧ == Some τ-i →
+                    Δ , Σ' ⊢ r-i ·: τ-i) →
                  Δ , Σ' ⊢ ⟨ rs ⟩ ·: ⟨ τs ⟩
-      TAGet  : ∀{Δ Σ' i r τs} →
-                 (i<∥τs∥ : i < ∥ τs ∥) →
+      TAGet  : ∀{Δ Σ' i r τs τ-i} →
+                 τs ⟦ i ⟧ == Some τ-i →
                  Δ , Σ' ⊢ r ·: ⟨ τs ⟩ →
-                 Δ , Σ' ⊢ get[ i th-of ∥ τs ∥ ] r ·: (τs ⟦ i given i<∥τs∥ ⟧)
+                 Δ , Σ' ⊢ get[ i th-of ∥ τs ∥ ] r ·: τ-i
       TACtor : ∀{Δ Σ' d cctx c r τ} →
                  (d , cctx) ∈ π1 Σ' →
                  (c , τ) ∈ cctx →
@@ -356,11 +352,12 @@ module core where
                  (_==_ {A = result} ⟨ rs1 ⟩ ⟨ rs2 ⟩ → ⊥) →
                  ∥ rs1 ∥ == ∥ rs2 ∥ →
                  ∥ rs1 ∥ == ∥ ks ∥ →
-                 (∀{i} →
-                    (i<∥rs1∥ : i < ∥ rs1 ∥) →
-                    (i<∥rs2∥ : i < ∥ rs2 ∥) →
-                    (i<∥ks∥ : i < ∥ ks ∥) →
-                    Constraints⦃ rs1 ⟦ i given i<∥rs1∥ ⟧ , rs2 ⟦ i given i<∥rs2∥ ⟧ ⦄:= (ks ⟦ i given i<∥ks∥ ⟧)) →
+                 (∀{i r1-i r2-i k-i} →
+                    rs1 ⟦ i ⟧ == Some r1-i →
+                    rs2 ⟦ i ⟧ == Some r2-i →
+                    ks  ⟦ i ⟧ == Some k-i →
+                    Constraints⦃ r1-i , r2-i ⦄:= k-i) →
+                 -- TODO - we should either not use foldl here, or, we should use zip and such elsewhere
                  Constraints⦃ ⟨ rs1 ⟩ , ⟨ rs2 ⟩ ⦄:= foldl _++_ [] ks
     XCCTor   : ∀{c r1 r2 k} →
                  (_==_ {A = result} (C[ c ] r1) (C[ c ] r2) → ⊥) →
@@ -407,12 +404,12 @@ module core where
     ETuple           : ∀{E ⛽ es rs ks} →
                          ∥ es ∥ == ∥ rs ∥ →
                          ∥ es ∥ == ∥ ks ∥ →
-                         -- TODO this should probably factored out somehow
-                         (∀{i} →
-                            (i<∥es∥ : i < ∥ es ∥) →
-                            (i<∥rs∥ : i < ∥ rs ∥) →
-                            (i<∥ks∥ : i < ∥ ks ∥) →
-                            E ⊢ es ⟦ i given i<∥es∥ ⟧ ⌊ ⛽ ⌋⇒ rs ⟦ i given i<∥rs∥ ⟧ ⊣ (ks ⟦ i given i<∥ks∥ ⟧)) →
+                         (∀{i e-i r-i k-i} →
+                            es ⟦ i ⟧ == Some e-i →
+                            rs ⟦ i ⟧ == Some r-i →
+                            ks ⟦ i ⟧ == Some k-i →
+                            E ⊢ e-i ⌊ ⛽ ⌋⇒ r-i ⊣ k-i) →
+                         -- TODO - we should either not use foldl here, or, we should use zip and such elsewhere
                          E ⊢ ⟨ es ⟩ ⌊ ⛽ ⌋⇒ ⟨ rs ⟩ ⊣ foldl _++_ [] ks
     ECtor            : ∀{E ⛽ c e r k} →
                          E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
@@ -436,11 +433,11 @@ module core where
                          (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
                          E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
                          E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ k1 ++ k2
-    EGet             : ∀{E ⛽ i n e rs k} →
+    EGet             : ∀{E ⛽ i n e rs r-i k} →
                          n == ∥ rs ∥ →
-                         (h : i < ∥ rs ∥) →
+                         rs ⟦ i ⟧ == Some r-i →
                          E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ rs ⟩ ⊣ k →
-                         E ⊢ get[ i th-of n ] e ⌊ ⛽ ⌋⇒ (rs ⟦ i given h ⟧) ⊣ k
+                         E ⊢ get[ i th-of n ] e ⌊ ⛽ ⌋⇒ r-i ⊣ k
     EGetUnfinished   : ∀{E ⛽ i n e r k} →
                          E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
                          (∀{rs} → r ≠ ⟨ rs ⟩) →
@@ -470,9 +467,9 @@ module core where
   -- Generic constraint failure - this goes through if evaluation would fail due to unsatisfiable constraints,
   -- and it may go through if evaluation diverges. But it cannot be true if evaluation converges and all constraints are valid.
   data _⊢_⌊_⌋⇒∅ : env → exp → Fuel → Set where
-    EFTpl        : ∀{E ⛽ es j} →
-                     (j<∥es∥ : j < ∥ es ∥) →
-                     E ⊢ es ⟦ j given j<∥es∥ ⟧ ⌊ ⛽ ⌋⇒∅ →
+    EFTpl        : ∀{E ⛽ es j e-j} →
+                     es ⟦ j ⟧ == Some e-j →
+                     E ⊢ e-j ⌊ ⛽ ⌋⇒∅ →
                      E ⊢ ⟨ es ⟩ ⌊ ⛽ ⌋⇒∅
     EFCtor       : ∀{E ⛽ c e} →
                      E ⊢ e ⌊ ⛽ ⌋⇒∅ →
@@ -539,17 +536,14 @@ module core where
               (C[ c ] ex) ·⊨ (C[ c ] v)
     STpl  : ∀{exs vs} →
               ∥ exs ∥ == ∥ vs ∥ →
-              (∀{i v} →
-                 (i<∥exs∥ : i < ∥ exs ∥) →
-                 (i<∥vs∥ : i < ∥ vs ∥) →
-                 v == (vs ⟦ i given i<∥vs∥ ⟧) →
-                   v value ∧
-                   (exs ⟦ i given i<∥exs∥ ⟧) ·⊨ v) →
+              (∀{i ex-i v-i} →
+                 exs ⟦ i ⟧ == Some ex-i →
+                 vs ⟦ i ⟧ == Some v-i →
+                 v-i value ∧ ex-i ·⊨ v-i) →
               ⟨ exs ⟩ ·⊨ ⟨ vs ⟩
     SPF   : ∀{E pf x e} →
               (∀{i v ex} →
-                 (i<∥pf∥ : i < ∥ pf ∥) →
-                 (v , ex) == pf ⟦ i given i<∥pf∥ ⟧ →
+                 pf ⟦ i ⟧ == Some (v , ex) →
                  Σ[ v' ∈ result ] Σ[ k ∈ constraints ] (
                     (E ,, (x , v)) ⊢ e ⇒ v' ⊣ k ∧
                     v' value ∧
@@ -572,48 +566,44 @@ module core where
       IRCtor : ∀{Σ' Γ W W' d cctx c τ e} →
                  (d , cctx) ∈ π1 Σ' →
                  (c , τ) ∈ cctx →
+                 -- TODO - we should either not use map here, or, we should use zip and such elsewhere
                  W == map (λ {(E , ex) → (E , C[ c ] ex)}) W' →
                  Σ' , Γ , W' ⊢ τ ↑ e →
                  Σ' , Γ , W ⊢ D[ d ] ↑ (C[ c ] e)
       IRTpl : ∀{Σ' Γ n m W Es exs τs es} →
-                n == ∥ es ∥ →
-                n == ∥ τs ∥ →
-                m == ∥ W ∥ →
-                m == ∥ Es ∥ →
-                m == ∥ exs ∥ →
-                (∀{j} →
-                   (j<∥exs∥ : j < ∥ exs ∥) →
-                   n == ∥ exs ⟦ j given j<∥exs∥ ⟧ ∥) →
-                (∀{j} →
-                   (j<∥W∥ : j < ∥ W ∥) →
-                   (j<∥Es∥ : j < ∥ Es ∥) →
-                   (j<∥exs∥ : j < ∥ exs ∥) →
-                   W ⟦ j given j<∥W∥ ⟧ == (Es ⟦ j given j<∥Es∥ ⟧ , ⟨ exs ⟦ j given j<∥exs∥ ⟧ ⟩)) →
-                (∀{i} →
-                   (i<∥τs∥ : i < ∥ τs ∥) →
-                   (i<∥es∥ : i < ∥ es ∥) →
+                n == ∥ es ∥ → n == ∥ τs ∥ →
+                m == ∥ W ∥ → m == ∥ Es ∥ → m == ∥ exs ∥ →
+                (∀{j ex-j} → exs ⟦ j ⟧ == Some ex-j → n == ∥ ex-j ∥) →
+                (∀{j W-j E-j ex-j} →
+                   W   ⟦ j ⟧ == Some W-j →
+                   Es  ⟦ j ⟧ == Some E-j →
+                   exs ⟦ j ⟧ == Some ex-j →
+                   W-j == (E-j , ⟨ ex-j ⟩)) →
+                (∀{i τ-i e-i} →
+                   τs ⟦ i ⟧ == Some τ-i →
+                   es ⟦ i ⟧ == Some e-i →
                    Σ[ Wi ∈ worlds ] (
                       (m == ∥ Wi ∥)
                         ∧
-                      (∀{j} →
-                         (j<∥Wi∥ : j < ∥ Wi ∥) →
-                         (j<∥Es∥ : j < ∥ Es ∥) →
-                         (j<∥exs∥ : j < ∥ exs ∥) →
-                         (i<∥exsj∥ : i < ∥ exs ⟦ j given j<∥exs∥ ⟧ ∥) →
-                         Wi ⟦ j given j<∥Wi∥ ⟧ == (Es ⟦ j given j<∥Es∥ ⟧ , exs ⟦ j given j<∥exs∥ ⟧ ⟦ i given i<∥exsj∥ ⟧))
+                      (∀{j Wi-j E-j ex-j ex-j-i} →
+                         Wi   ⟦ j ⟧ == Some Wi-j →
+                         Es   ⟦ j ⟧ == Some E-j →
+                         exs  ⟦ j ⟧ == Some ex-j →
+                         ex-j ⟦ i ⟧ == Some ex-j-i →
+                         Wi-j == (E-j , ex-j-i))
                         ∧
-                      (Σ' , Γ , Wi ⊢ τs ⟦ i given i<∥τs∥ ⟧ ↑ (es ⟦ i given i<∥es∥ ⟧)))) →
+                      (Σ' , Γ , Wi ⊢ τ-i ↑ e-i))) →
                 Σ' , Γ , W ⊢ ⟨ τs ⟩ ↑ ⟨ es ⟩
       IRLam : ∀{Σ' Γ W W' τ1 τ2 ⦇E,pf⦈s x e} →
                 ∥ ⦇E,pf⦈s ∥ == ∥ W ∥ →
                 -- Each example in the worlds is a partial function
                 -- The envs and pfs are destructed and retained in ⦇E,pf⦈s
-                (∀{i} →
-                   (i<∥W∥ : i < ∥ W ∥) →
-                   (i<∥Epfs∥ : i < ∥ ⦇E,pf⦈s ∥) →
-                   Σ[ E ∈ env ] Σ[ pf ∈ pf ] (
-                      (E , PF pf) == W ⟦ i given i<∥W∥ ⟧ ∧
-                      (E , pf) == ⦇E,pf⦈s ⟦ i given i<∥Epfs∥ ⟧)) →
+                (∀{i E-i ex-i} →
+                   W ⟦ i ⟧ == Some (E-i , ex-i) →
+                   Σ[ pf-i ∈ pf ] (
+                      ex-i == PF pf-i ∧
+                      ⦇E,pf⦈s ⟦ i ⟧ == Some (E-i , pf-i))) →
+                -- TODO - we should either not use concat and map here, or, we should use zip and such elsewhere
                 W' == concat
                         (map (λ {(E , pf) →
                            map (λ {(v , ex) →
@@ -638,13 +628,11 @@ module core where
                   -- the constructor name and value that the scrutinee would evaluate
                   -- to in that world.
                   (∀{i E ex} →
-                     (i<∥W∥ : i < ∥ W ∥) →
-                     (i<∥W'∥ : i < ∥ W' ∥) →
-                     (E , ex) == W ⟦ i given i<∥W∥ ⟧ →
+                     W ⟦ i ⟧ == Some (E , ex) →
                      Σ[ c ∈ Nat ] Σ[ v ∈ result ] (
                        dom cctx c ∧
                        v value ∧
-                       (c , E , ex , v) == W' ⟦ i given i<∥W'∥ ⟧ ∧
+                       W' ⟦ i ⟧ == Some (c , E , ex , v) ∧
                        E ⊢ e ⇒ C[ c ] v ⊣ [])) →
                   -- For each c in the domain of cctx, W'' maps to a list of extended worlds,
                   -- where each extended world has the specified example, but an env where the
@@ -677,11 +665,11 @@ module core where
                 Σ' , Γ ⊢ τ1 ==> τ2 ↥ e1 →
                 Σ' , Γ , [] ⊢ τ1 ↑ e2 →
                 Σ' , Γ ⊢ τ2 ↥ (e1 ∘ e2)
-      EGGet : ∀{Σ' Γ τs i n e} →
+      EGGet : ∀{Σ' Γ τ-i i n τs e} →
                 n == ∥ τs ∥ →
-                (i<∥τs∥ : i < ∥ τs ∥) →
+                τs ⟦ i ⟧ == Some τ-i →
                 Σ' , Γ ⊢ ⟨ τs ⟩ ↥ e →
-                Σ' , Γ ⊢ τs ⟦ i given i<∥τs∥ ⟧ ↥ (get[ i th-of n ] e)
+                Σ' , Γ ⊢ τ-i ↥ (get[ i th-of n ] e)
 
   data _,_⊢Solve_:=_ : hctx → denv → constraints → exp ctx → Set where
     Sol : ∀{Δ Σ' k g s} →

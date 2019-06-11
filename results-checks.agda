@@ -30,17 +30,15 @@ module results-checks where
 
     pf-value-complete : ∀{pf} → pf pf-value → pf pf-complete
     pf-value-complete (PFV pf-vals) =
-      PFC λ i<∥pf∥ →
-          λ where refl → (
-                    let (val-cmp , ex-cmp) = pf-vals i<∥pf∥ refl in
-                    values-complete val-cmp , ex-values-complete ex-cmp)
+      PFC λ i<∥pf∥ → (
+            let (val-cmp , ex-cmp) = pf-vals i<∥pf∥ in
+            values-complete val-cmp , ex-values-complete ex-cmp)
 
     pf-value-final : ∀{pf} → pf pf-value → pf pf-final
     pf-value-final (PFV pf-vals) =
-      PFF λ i<∥pf∥ →
-          λ where refl → (
-                    let (val-fin , ex-fin) = pf-vals i<∥pf∥ refl in
-                    values-final val-fin , ex-values-final ex-fin)
+      PFF λ i<∥pf∥ → (
+            let (val-fin , ex-fin) = pf-vals i<∥pf∥ in
+            values-final val-fin , ex-values-final ex-fin)
 
     ex-values-complete : ∀{ex} → ex ex-value → ex ex-complete
     ex-values-complete (EXVPF pf-val) = EXCPF (pf-value-complete pf-val)
@@ -54,13 +52,15 @@ module results-checks where
 
     -- if an example type-checks, it's a value
     ex-ta-value : ∀{Σ' ex τ} → Σ' ⊢ ex :· τ → ex ex-value
-    ex-ta-value (TATpl ∥exs⊫=∥τs∥ h) = EXVTpl (λ {i} i<∥exs∥ → ex-ta-value (h i<∥exs∥ (tr (λ y → i < y) ∥exs⊫=∥τs∥ i<∥exs∥)))
+    ex-ta-value (TATpl ∥exs∥==∥τs∥ h)
+      = EXVTpl (λ {i ex-i} exs[i]==ex-i →
+          let _ , τs[i]==τ-i = ∥l1∥==∥l2∥→l1[i]→l2[i] ∥exs∥==∥τs∥ exs[i]==ex-i in
+          ex-ta-value (h exs[i]==ex-i τs[i]==τ-i))
     ex-ta-value (TACtor _ _ ta) = EXVCtor (ex-ta-value ta)
-    ex-ta-value {ex = PF pf} (TAPF h) =
-      EXVPF (PFV λ i<∥pf∥ →
-                 λ where refl →
-                           let (rval , rta , exta) = h i<∥pf∥ refl in
-                           rval , ex-ta-value exta)
+    ex-ta-value {ex = PF pf} (TAPF h)
+      = EXVPF (PFV λ {i v-i ex-i} pf[i]==v,ex →
+          let (rval , rta , exta) = h pf[i]==v,ex in
+          rval , (ex-ta-value exta))
 
     -- pf-ta-value : ∀{Σ' pf τ} → Σ' ⊢ ex :· τ → ex ex-value
 

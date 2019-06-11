@@ -47,14 +47,13 @@ module finality where
   finality E-final ctxcons (TAApp h ta-f ta-arg) (EAppUnfinished eval-f h2 h3 eval-arg) =
     FAp (finality E-final ctxcons ta-f eval-f) (finality E-final ctxcons ta-arg eval-arg) h2 h3
   finality E-final ctxcons (TATpl h h2 h3) (ETuple h4 h5 h6) =
-    FTpl λ {i} i<∥rs∥ →
+    FTpl (λ {i} rs[i] →
       let
-        tr< = λ {x y} eq st → tr {x = x} {y} (λ y → i < y) eq st
-        i<∥es∥ = tr< (! h4) i<∥rs∥
-        i<∥ks∥ = tr< h5 i<∥es∥
-        i<∥τs∥ = tr< h i<∥es∥
+        _ , es[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] (! h4) rs[i]
+        _ , ks[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] h5 es[i]
+        _ , τs[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] h es[i]
       in
-      finality E-final ctxcons (h3 i<∥es∥ i<∥τs∥) (h6 i<∥es∥ i<∥rs∥ i<∥ks∥)
+      finality E-final ctxcons (h3 es[i] τs[i]) (h6 es[i] rs[i] ks[i]))
   finality E-final ctxcons (TAGet ∥rs⊫=∥τs∥ i<∥τs∥ ta) (EGet _ h eval)
     with finality E-final ctxcons ta eval
   ... | FTpl all-fin = all-fin h
@@ -78,4 +77,4 @@ module finality where
   finality E-final ctxcons (TAPF ta) EPF
     with ex-ta-value ta
   ... | EXVPF pf-val = FPF (pf-value-final pf-val)
-  finality E-final ctxcons (TAAsrt _ _ _) (EAsrt _ _ _) = FTpl (λ i<∥rs∥ → abort (n≮0 i<∥rs∥))
+  finality E-final ctxcons (TAAsrt _ _ _) (EAsrt _ _ _) = FTpl (λ ())

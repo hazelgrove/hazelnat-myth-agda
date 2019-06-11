@@ -42,28 +42,26 @@ module lemmas-progress where
                        h4 , _ , h5 , h6
   typ-inhabitance-pres Γ⊢E (TAHole u∈Δ) = _ , TAHole u∈Δ Γ⊢E
   typ-inhabitance-pres Γ⊢E (TAPF ta) = _ , TAPF ta
-  typ-inhabitance-pres Γ⊢E (TAAsrt _ e-ta1 e-ta2)
-    = _ , TATpl refl (λ i<∥rs∥ i<∥τs∥ → abort (n≮0 i<∥τs∥))
+  typ-inhabitance-pres Γ⊢E (TAAsrt _ e-ta1 e-ta2) = _ , TATpl refl (λ ())
 
-  typ-inhabitance-pres-tpl {es = []} {[]} Γ⊢E es-ta
-    = _ , TATpl refl (λ i<∥rs∥ i<∥τs∥ → abort (n≮0 i<∥τs∥))
+  typ-inhabitance-pres-tpl {es = []} {[]} Γ⊢E es-ta = _ , TATpl refl (λ ())
   typ-inhabitance-pres-tpl {es = []} {_ :: τs} Γ⊢E (TATpl () x₂ x₃)
   typ-inhabitance-pres-tpl {es = _ :: es} {[]} Γ⊢E (TATpl () x₂ x₃)
   typ-inhabitance-pres-tpl {Δ} {Σ'} {Γ} {E} {e :: es} {τ :: τs} Γ⊢E (TATpl ∥es∥==∥τs∥ hh h)
-    with typ-inhabitance-pres-tpl Γ⊢E (TATpl (1+inj ∥es∥==∥τs∥) hh' h') | typ-inhabitance-pres {e = e} Γ⊢E (h 0<1+n 0<1+n)
-         where
-           hh' : {i j : Nat} (i<∥es∥ : i < ∥ es ∥) (j<∥es∥ : j < ∥ es ∥) → i ≠ j → holes-disjoint (es ⟦ i given i<∥es∥ ⟧) (es ⟦ j given j<∥es∥ ⟧)
-           hh' i<∥es∥ j<∥es∥ i≠j
-             rewrite index-proof-irrelevance {p1 = i<∥es∥} {1+n<1+m→n<m (n<m→1+n<1+m i<∥es∥)}
-                   | index-proof-irrelevance {p1 = j<∥es∥} {1+n<1+m→n<m (n<m→1+n<1+m j<∥es∥)}
-               = hh (n<m→1+n<1+m i<∥es∥) (n<m→1+n<1+m j<∥es∥) (1+inj-cp i≠j)
-           h' : {i : Nat} (i<∥es∥ : i < ∥ es ∥) (i<∥τs∥ : i < ∥ τs ∥) → Δ , Σ' , Γ ⊢ es ⟦ i given i<∥es∥ ⟧ :: (τs ⟦ i given i<∥τs∥ ⟧)
-           h' i<∥es∥ i<∥τs∥
-             rewrite index-proof-irrelevance {p1 = i<∥es∥} {1+n<1+m→n<m (n<m→1+n<1+m i<∥es∥)}
-                   | index-proof-irrelevance {p1 = i<∥τs∥} {1+n<1+m→n<m (n<m→1+n<1+m i<∥τs∥)}
-               = h (n<m→1+n<1+m i<∥es∥) (n<m→1+n<1+m i<∥τs∥)
-  ... | rs , TATpl ∥rs∥==∥τs∥ h2 | r , r-ta
-          = r :: rs , TATpl (1+ap ∥rs∥==∥τs∥) λ {
-              {Z}    i<∥rs∥ i<∥τs∥ → r-ta ;
-              {1+ i} i<∥rs∥ i<∥τs∥ → h2 (1+n<1+m→n<m i<∥rs∥) (1+n<1+m→n<m i<∥τs∥)
-            }
+    with typ-inhabitance-pres-tpl Γ⊢E (TATpl
+           (1+inj ∥es∥==∥τs∥)
+           (λ i≠j es[i] es[j] → hh (1+inj-cp i≠j) es[i] es[j])
+           λ {i} es[i] τs[i] → h {1+ i} es[i] τs[i])
+       | typ-inhabitance-pres {e = e} Γ⊢E (h {Z} refl refl)
+  ...  | rs , TATpl ∥rs∥==∥τs∥ h2 | r , r-ta
+    = r :: rs , TATpl (1+ap ∥rs∥==∥τs∥) (λ {i} → ap-h2 {i})
+      where
+        ap-h2 : ∀{i r-i τ-i} →
+                 (r :: rs) ⟦ i ⟧ == Some r-i →
+                 (τ :: τs) ⟦ i ⟧ == Some τ-i →
+                 Δ , Σ' ⊢ r-i ·: τ-i
+        ap-h2 {Z}    r::rs[i] τ::τs[i]
+          rewrite someinj τ::τs[i] | someinj r::rs[i]
+            = r-ta
+        ap-h2 {1+ i} r::rs[i] τ::τs[i]
+          = h2 r::rs[i] τ::τs[i]

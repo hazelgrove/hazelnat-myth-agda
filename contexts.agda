@@ -56,12 +56,12 @@ module contexts where
   -- but this can be used in cases where using _∈_
   -- would be too verbose or awkward.
   -- The lookup theorems prove that they are compatible
-  _⟦_⟧ : {A : Set} → A ctx → Nat → Maybe A
-  [] ⟦ x ⟧ = None
-  ((hx , ha) :: t) ⟦ x ⟧ with <dec x hx
+  _⦃⦃_⦄⦄ : {A : Set} → A ctx → Nat → Maybe A
+  [] ⦃⦃ x ⦄⦄ = None
+  ((hx , ha) :: t) ⦃⦃ x ⦄⦄ with <dec x hx
   ... | Inl x<hx       = None
   ... | Inr (Inl refl) = Some ha
-  ... | Inr (Inr hx<x) = t ⟦ diff-1 hx<x ⟧
+  ... | Inr (Inr hx<x) = t ⦃⦃ diff-1 hx<x ⦄⦄
 
   ---- lemmas ----
 
@@ -79,12 +79,12 @@ module contexts where
     x+1+xb==xb (≤antisym x+1+xb≤xb (≤trans (≤1+ ≤refl) n≤m+n))
 
   all-not-none : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
-                  None ≠ (((x , a) :: Γ) ⟦ x ⟧)
+                  None ≠ (((x , a) :: Γ) ⦃⦃ x ⦄⦄)
   all-not-none {x = x} rewrite <dec-refl x = λ ()
 
   all-bindings-==-rec-eq : {A : Set} {Γ1 Γ2 : A ctx} {x : Nat} {a : A} →
-                            ((x' : Nat) → ((x , a) :: Γ1) ⟦ x' ⟧ == ((x , a) :: Γ2) ⟦ x' ⟧) →
-                            ((x' : Nat) → Γ1 ⟦ x' ⟧ == Γ2 ⟦ x' ⟧)
+                            ((x' : Nat) → ((x , a) :: Γ1) ⦃⦃ x' ⦄⦄ == ((x , a) :: Γ2) ⦃⦃ x' ⦄⦄) →
+                            ((x' : Nat) → Γ1 ⦃⦃ x' ⦄⦄ == Γ2 ⦃⦃ x' ⦄⦄)
   all-bindings-==-rec-eq {x = x} h x'
     with h (x' + 1+ x)
   ... | eq
@@ -97,8 +97,8 @@ module contexts where
           rewrite ! (undiff-1 x x' x<x'+1+x) = eq
 
   all-bindings-==-rec : {A : Set} {Γ1 Γ2 : A ctx} {x1 x2 : Nat} {a1 a2 : A} →
-                         ((x : Nat) → ((x1 , a1) :: Γ1) ⟦ x ⟧ == ((x2 , a2) :: Γ2) ⟦ x ⟧) →
-                         ((x : Nat) → Γ1 ⟦ x ⟧ == Γ2 ⟦ x ⟧)
+                         ((x : Nat) → ((x1 , a1) :: Γ1) ⦃⦃ x ⦄⦄ == ((x2 , a2) :: Γ2) ⦃⦃ x ⦄⦄) →
+                         ((x : Nat) → Γ1 ⦃⦃ x ⦄⦄ == Γ2 ⦃⦃ x ⦄⦄)
   all-bindings-==-rec {x1 = x1} {x2} h x
     with h x1 | h x2
   ... | eq1 | eq2
@@ -122,15 +122,15 @@ module contexts where
 
   -- lookup is decidable
   lookup-dec : {A : Set} (Γ : A ctx) (x : Nat) →
-                Σ[ a ∈ A ] (Γ ⟦ x ⟧ == Some a) ∨ Γ ⟦ x ⟧ == None
+                Σ[ a ∈ A ] (Γ ⦃⦃ x ⦄⦄ == Some a) ∨ Γ ⦃⦃ x ⦄⦄ == None
   lookup-dec Γ x
-    with Γ ⟦ x ⟧
+    with Γ ⦃⦃ x ⦄⦄
   ... | Some a = Inl (a , refl)
   ... | None   = Inr refl
 
-  -- The next two theorems show that lookup (_⟦_⟧) is consistent with membership (_∈_)
+  -- The next two theorems show that lookup (_⦃⦃_⦄⦄) is consistent with membership (_∈_)
   lookup-cons-1 : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
-                   Γ ⟦ x ⟧ == Some a →
+                   Γ ⦃⦃ x ⦄⦄ == Some a →
                    (x , a) ∈ Γ
   lookup-cons-1 {Γ = []} ()
   lookup-cons-1 {Γ = (hx , ha) :: t} {x} h
@@ -145,7 +145,7 @@ module contexts where
 
   lookup-cons-2 : {A : Set} {Γ : A ctx} {x : Nat} {a : A} →
                    (x , a) ∈ Γ →
-                   Γ ⟦ x ⟧ == Some a
+                   Γ ⦃⦃ x ⦄⦄ == Some a
   lookup-cons-2 {x = x} InH rewrite <dec-refl x = refl
   lookup-cons-2 (InT {Γ = Γ} {x = x} {s} {a} x∈Γ)
     with <dec (x + 1+ s) s
@@ -265,7 +265,7 @@ module contexts where
   -- (i.e. they represent the same mapping from ids to values),
   -- then they are physically equal as judged by _==_
   ctx-==-eqv : {A : Set} {Γ1 Γ2 : A ctx} →
-                ((x : Nat) → Γ1 ⟦ x ⟧ == Γ2 ⟦ x ⟧) →
+                ((x : Nat) → Γ1 ⦃⦃ x ⦄⦄ == Γ2 ⦃⦃ x ⦄⦄) →
                 Γ1 == Γ2
   ctx-==-eqv {Γ1 = []} {[]} all-bindings-== = refl
   ctx-==-eqv {Γ1 = []} {(hx2 , ha2) :: t2} all-bindings-==
@@ -343,14 +343,14 @@ module contexts where
 
   lookup-cp-1 : {A : Set} {Γ : A ctx} {x : Nat} →
                  x # Γ →
-                 Γ ⟦ x ⟧ == None
+                 Γ ⦃⦃ x ⦄⦄ == None
   lookup-cp-1 {Γ = Γ} {x} x#Γ
     with lookup-dec Γ x
   ... | Inl (_ , x∈Γ) = abort (x#Γ (_ , (lookup-cons-1 x∈Γ)))
   ... | Inr x#'Γ      = x#'Γ
 
   lookup-cp-2 : {A : Set} {Γ : A ctx} {x : Nat} →
-                 Γ ⟦ x ⟧ == None →
+                 Γ ⦃⦃ x ⦄⦄ == None →
                  x # Γ
   lookup-cp-2 {Γ = Γ} {x} x#Γ
     with ctxindirect Γ x
@@ -386,8 +386,8 @@ module contexts where
     = ctx-==-eqv fun
       where
         fun : (x : Nat) →
-               (Γ ,, (x1 , a1) ,, (x2 , a2)) ⟦ x ⟧ ==
-               (Γ ,, (x2 , a2) ,, (x1 , a1)) ⟦ x ⟧
+               (Γ ,, (x1 , a1) ,, (x2 , a2)) ⦃⦃ x ⦄⦄ ==
+               (Γ ,, (x2 , a2) ,, (x1 , a1)) ⦃⦃ x ⦄⦄
         fun x
           with natEQ x x1 | natEQ x x2 | ctxindirect Γ x
         fun x  | Inl refl | Inl refl | _

@@ -85,15 +85,14 @@ module completeness where
         eval-completeness Ecmp Γ⊢E ta-arg eval-arg cmp-arg
   eval-completeness Ecmp Γ⊢E (TAApp _ ta1 ta2) (EAppUnfinished eval1 _ _ eval2) (ECAp ecmp1 ecmp2) =
     RCAp (eval-completeness Ecmp Γ⊢E ta1 eval1 ecmp1) (eval-completeness Ecmp Γ⊢E ta2 eval2 ecmp2)
-  eval-completeness Ecmp Γ⊢E (TATpl ∥es⊫=∥τs∥ _ tas) (ETuple ∥es⊫=∥rs∥ ∥es⊫=∥ks∥ evals) (ECTpl cmps) =
-    RCTpl λ {i} i<∥rs∥ →
+  eval-completeness Ecmp Γ⊢E (TATpl ∥es∥==∥τs∥ _ tas) (ETuple ∥es∥==∥rs∥ ∥es∥==∥ks∥ evals) (ECTpl cmps) =
+    RCTpl λ {i} rs[i] →
       let
-        tr< = λ {x y} eq st → tr {x = x} {y} (λ y → i < y) eq st
-        i<∥es∥ = tr< (! ∥es⊫=∥rs∥) i<∥rs∥
-        i<∥ks∥ = tr< ∥es⊫=∥ks∥ i<∥es∥
-        i<∥τs∥ = tr< ∥es⊫=∥τs∥ i<∥es∥
+        _ , es[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] (! ∥es∥==∥rs∥) rs[i]
+        _ , ks[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] ∥es∥==∥ks∥ es[i]
+        _ , τs[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] ∥es∥==∥τs∥ es[i]
       in
-      eval-completeness Ecmp Γ⊢E (tas i<∥es∥ i<∥τs∥) (evals i<∥es∥ i<∥rs∥ i<∥ks∥) (cmps i<∥es∥)
+      eval-completeness Ecmp Γ⊢E (tas es[i] τs[i]) (evals es[i] rs[i] ks[i]) (cmps es[i])
   eval-completeness Ecmp Γ⊢E (TAGet ∥rs⊫=∥τs∥ i<∥τs∥ ta) (EGet _ i<∥rs∥ eval) (ECGet ecmp)
     with eval-completeness Ecmp Γ⊢E ta eval ecmp
   ... | RCTpl h = h i<∥rs∥
@@ -119,5 +118,4 @@ module completeness where
     RCCase Ecmp (eval-completeness Ecmp Γ⊢E ta eval ecmp) rulescmp
   eval-completeness Ecmp Γ⊢E (TAHole _) EHole ()
   eval-completeness Ecmp Γ⊢E (TAPF _) EPF (ECPF pf-cmp) = RCPF pf-cmp
-  eval-completeness Ecmp Γ⊢E (TAAsrt _ _ _) (EAsrt _ _ _) (ECAsrt _ _) =
-    RCTpl (λ i<∥rs∥ → abort (n≮0 i<∥rs∥))
+  eval-completeness Ecmp Γ⊢E (TAAsrt _ _ _) (EAsrt _ _ _) (ECAsrt _ _) = RCTpl (λ ())

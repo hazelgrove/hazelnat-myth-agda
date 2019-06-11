@@ -190,6 +190,9 @@ module Nat where
   n<m→1+n≤m (≤refl , ne) = abort (ne refl)
   n<m→1+n≤m (≤1+ n≤m , _) = n≤m→1+n≤1+m n≤m
 
+  n<m→n≤m : ∀{n m} → n < m → n ≤ m
+  n<m→n≤m n<m = 1+n≤1+m→n≤m (≤1+ (n<m→1+n≤m n<m))
+
   <dec : (n m : Nat) → n < m ∨ n == m ∨ m < n
   <dec n m with natEQ n m
   ... | Inl refl = Inr (Inl refl)

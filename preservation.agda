@@ -19,9 +19,12 @@ module preservation where
   ... | π3 , π4 , π5 rewrite ctxunicity h π4 = π5
   preservation ctxcons (TAHole h) EHole = TAHole h ctxcons
   preservation ctxcons (TATpl h1 h2 h3) (ETuple h4 h5 h6) =
-    TATpl (! h4 · h1) λ {i} i<∥rs∥ i<∥τs∥ →
-      let i<∥es∥ = tr (λ y → i < y) (! h4) i<∥rs∥ in
-      preservation ctxcons (h3 i<∥es∥ i<∥τs∥) (h6 i<∥es∥ i<∥rs∥ (tr (λ y → i < y) h5 i<∥es∥))
+    TATpl (! h4 · h1) λ {i} rs[i]==r-i τs[i]==τ-i →
+      let
+        _ , es[i]==e-i = ∥l1∥==∥l2∥→l1[i]→l2[i] (! h1) τs[i]==τ-i
+        _ , ks[i]==k-i = ∥l1∥==∥l2∥→l1[i]→l2[i] h5 es[i]==e-i
+      in
+      preservation ctxcons (h3 es[i]==e-i τs[i]==τ-i) (h6 es[i]==e-i rs[i]==r-i ks[i]==k-i)
   preservation ctxcons (TACtor h1 h2 ta) (ECtor eval) = TACtor h1 h2 (preservation ctxcons ta eval)
   preservation ctxcons (TAApp _ ta-f ta-arg) (EApp CF∞ eval1 eval2 eval-ef) with preservation ctxcons ta-f eval1
   ... | TALam ctxcons-Ef (TALam x#Γ ta-ef) =
@@ -44,4 +47,4 @@ module preservation where
       let p1 , _ , _ , _ , p2 , p3 = h2 form' in
       p1 , _ , p2 , p3
   preservation ctxcons (TAPF ta) EPF = TAPF ta
-  preservation ctxcons (TAAsrt _ ta1 ta2) (EAsrt eval1 eval2 _) = TATpl refl λ i<∥rs∥ → abort (n≮0 i<∥rs∥)
+  preservation ctxcons (TAAsrt _ ta1 ta2) (EAsrt eval1 eval2 _) = TATpl refl λ ()

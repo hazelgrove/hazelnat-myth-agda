@@ -357,7 +357,6 @@ module core where
                     rs2 ⟦ i ⟧ == Some r2-i →
                     ks  ⟦ i ⟧ == Some k-i →
                     Constraints⦃ r1-i , r2-i ⦄:= k-i) →
-                 -- TODO - we should either not use foldl here, or, we should use zip and such elsewhere
                  Constraints⦃ ⟨ rs1 ⟩ , ⟨ rs2 ⟩ ⦄:= foldl _++_ [] ks
     XCCTor   : ∀{c r1 r2 k} →
                  (_==_ {A = result} (C[ c ] r1) (C[ c ] r2) → ⊥) →
@@ -409,7 +408,6 @@ module core where
                             rs ⟦ i ⟧ == Some r-i →
                             ks ⟦ i ⟧ == Some k-i →
                             E ⊢ e-i ⌊ ⛽ ⌋⇒ r-i ⊣ k-i) →
-                         -- TODO - we should either not use foldl here, or, we should use zip and such elsewhere
                          E ⊢ ⟨ es ⟩ ⌊ ⛽ ⌋⇒ ⟨ rs ⟩ ⊣ foldl _++_ [] ks
     ECtor            : ∀{E ⛽ c e r k} →
                          E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
@@ -566,19 +564,14 @@ module core where
       IRCtor : ∀{Σ' Γ W W' d cctx c τ e} →
                  (d , cctx) ∈ π1 Σ' →
                  (c , τ) ∈ cctx →
-                 -- TODO - we should either not use map here, or, we should use zip and such elsewhere
                  W == map (λ {(E , ex) → (E , C[ c ] ex)}) W' →
                  Σ' , Γ , W' ⊢ τ ↑ e →
                  Σ' , Γ , W ⊢ D[ d ] ↑ (C[ c ] e)
       IRTpl : ∀{Σ' Γ n m W Es exs τs es} →
-                n == ∥ es ∥ → n == ∥ τs ∥ →
                 m == ∥ W ∥ → m == ∥ Es ∥ → m == ∥ exs ∥ →
+                n == ∥ es ∥ → n == ∥ τs ∥ →
                 (∀{j ex-j} → exs ⟦ j ⟧ == Some ex-j → n == ∥ ex-j ∥) →
-                (∀{j W-j E-j ex-j} →
-                   W   ⟦ j ⟧ == Some W-j →
-                   Es  ⟦ j ⟧ == Some E-j →
-                   exs ⟦ j ⟧ == Some ex-j →
-                   W-j == (E-j , ⟨ ex-j ⟩)) →
+                W == zip Es (map ⟨_⟩ exs) →
                 (∀{i τ-i e-i} →
                    τs ⟦ i ⟧ == Some τ-i →
                    es ⟦ i ⟧ == Some e-i →
@@ -603,7 +596,6 @@ module core where
                    Σ[ pf-i ∈ pf ] (
                       ex-i == PF pf-i ∧
                       ⦇E,pf⦈s ⟦ i ⟧ == Some (E-i , pf-i))) →
-                -- TODO - we should either not use concat and map here, or, we should use zip and such elsewhere
                 W' == concat
                         (map (λ {(E , pf) →
                            map (λ {(v , ex) →

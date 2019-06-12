@@ -37,6 +37,19 @@ module List where
   concat [] = []
   concat (l1 :: rest) = l1 ++ (concat rest)
 
+  -- if the lists aren't the same length,
+  -- the extra elements of the longer list are ignored
+  zip : {A B : Set} → List A → List B → List (A ∧ B)
+  zip []        _         = []
+  zip (a :: as) []        = []
+  zip (a :: as) (b :: bs) = (a , b) :: zip as bs
+
+  unzip : {A B : Set} → List (A ∧ B) → (List A ∧ List B)
+  unzip [] = ([] , [])
+  unzip ((a , b) :: rest)
+    with unzip rest
+  ... | (as , bs) = (a :: as , b :: bs)
+
   -- theorems
 
   list-==-dec :  {A : Set} →
@@ -154,3 +167,22 @@ module List where
               foldl f b0 (l1 ++ l2) == foldl f (foldl f b0 l1) l2
   foldl-++ {l1 = []} = refl
   foldl-++ {l1 = a1 :: l1rest} = foldl-++ {l1 = l1rest}
+
+  -- zip/unzip theorems
+  unzip-inv : {A B : Set} {l : List (A ∧ B)} {la : List A} {lb : List B} →
+               unzip l == (la , lb) →
+               l == zip la lb
+  unzip-inv {l = []} form
+    with form
+  ... | refl = refl
+  unzip-inv {l = (a' , b') :: rest} {a :: as} {b :: bs} form
+    with unzip rest  | unzip-inv {l = rest} refl | form
+  ...  | (as' , bs') | refl                      | refl = refl
+
+  zip-inv : {A B : Set} {la : List A} {lb : List B} →
+             ∥ la ∥ == ∥ lb ∥ →
+             unzip (zip la lb) == (la , lb)
+  zip-inv {la = []}      {[]}      len-eq = refl
+  zip-inv {la = a :: as} {b :: bs} len-eq
+    with unzip (zip as bs) | zip-inv (1+inj len-eq)
+  ...  | (as' , bs')       | refl                   = refl

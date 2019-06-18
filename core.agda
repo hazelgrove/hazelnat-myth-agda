@@ -26,54 +26,10 @@ module core where
   mutual
     -- examples
     data ex : Set where
-      PF    : pf → ex
       ⟨⟩    : ex
       ⟨_,_⟩ : ex → ex → ex
       C[_]_ : Nat → ex → ex
 
-    -- partial functions
-    pf = List (result ∧ ex)
-
-    data _ex-complete : ex → Set where
-      EXCPF   : ∀{pf} → pf pf-complete → (PF pf) ex-complete
-      EXCUnit : ⟨⟩ ex-complete
-      EXCPair : ∀{ex1 ex2} → ex1 ex-complete → ex2 ex-complete → ⟨ ex1 , ex2 ⟩ ex-complete
-      EXCCtor : ∀{c ex} → ex ex-complete → (C[ c ] ex) ex-complete
-
-    data _pf-complete : pf → Set where
-      PFC : ∀{pf} →
-              (∀{i r ex} →
-                 pf ⟦ i ⟧ == Some (r , ex) →
-                 r rcomplete ∧ ex ex-complete) →
-              pf pf-complete
-
-    data _ex-value : ex → Set where
-      EXVPF   : ∀{pf} → pf pf-value → (PF pf) ex-value
-      EXVUnit : ⟨⟩ ex-value
-      EXVPair : ∀{ex1 ex2} → ex1 ex-value → ex2 ex-value → ⟨ ex1 , ex2 ⟩ ex-value
-      EXVCtor : ∀{c ex} → ex ex-value → (C[ c ] ex) ex-value
-
-    data _pf-value : pf → Set where
-      PFV : ∀{pf} →
-              (∀{i v ex} →
-                 pf ⟦ i ⟧ == Some (v , ex) →
-                 v value ∧ ex ex-value) →
-              pf pf-value
-
-    data _ex-final : ex → Set where
-      EXFPF   : ∀{pf} → pf pf-final → (PF pf) ex-final
-      EXFUnit : ⟨⟩ ex-final
-      EXFPair : ∀{ex1 ex2} → ex1 ex-final → ex2 ex-final → ⟨ ex1 , ex2 ⟩ ex-final
-      EXFCtor : ∀{c ex} → ex ex-final → (C[ c ] ex) ex-final
-
-    data _pf-final : pf → Set where
-      PFF : ∀{pf} →
-              (∀{i f ex} →
-                 pf ⟦ i ⟧ == Some (f , ex) →
-                 f final ∧ ex ex-final) →
-              pf pf-final
-
-    -- type assignment for examples. only complete examples can type-check
     data _⊢_:·_ : denv → ex → typ → Set where
       TAUnit : ∀{Σ'} → Σ' ⊢ ⟨⟩ :· ⟨⟩
       TAPair : ∀{Σ' ex1 ex2 τ1 τ2} →
@@ -85,11 +41,6 @@ module core where
                  (c , τ) ∈ cctx →
                  Σ' ⊢ ex :· τ →
                  Σ' ⊢ C[ c ] ex :· D[ d ]
-      TAPF   : ∀{Σ' pf τ1 τ2} →
-                 (∀{i v ex} →
-                    pf ⟦ i ⟧ == Some (v , ex) →
-                    v value ∧ (∅ , Σ' ⊢ v ·: τ1) ∧ Σ' ⊢ ex :· τ2) →
-                 Σ' ⊢ PF pf :· τ1 ==> τ2
 
     record rule : Set where
       inductive
@@ -111,7 +62,6 @@ module core where
       C[_]_         : Nat → exp → exp
       case_of⦃·_·⦄ : exp → rule ctx → exp
       ??[_]         : Nat → exp
-      PF            : pf → exp
       PBE:assert    : exp → exp → exp
 
     data hole-name-new : (e : exp) → (u : Nat) → Set where
@@ -129,9 +79,6 @@ module core where
                   (∀{c rule} → (c , rule) ∈ rules → hole-name-new (rule.branch rule) u) →
                   hole-name-new (case e of⦃· rules ·⦄) u
       HNNHole : ∀{u' u} → u' ≠ u → hole-name-new (??[ u' ]) u
-      -- pf shouldn't be incomplete, so we don't define a case for incomplete pfs in which the hole would
-      -- nonetheless be new
-      HNNPF   : ∀{pf u} → pf pf-complete → hole-name-new (PF pf) u
       HNNAsrt : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (PBE:assert e1 e2) u
 
     data holes-disjoint : (e1 : exp) → (e2 : exp) → Set where
@@ -149,9 +96,6 @@ module core where
                  (∀{c rule} → (c , rule) ∈ rules → holes-disjoint (rule.branch rule) e') →
                  holes-disjoint (case e of⦃· rules ·⦄) e'
       HDHole : ∀{u e'} → hole-name-new e' u → holes-disjoint (??[ u ]) e'
-      -- pf shouldn't be incomplete, so we don't define a case for incomplete pfs in which the holes would
-      -- nonetheless be disjoint
-      HDPF   : ∀{pf e'} → pf pf-complete → holes-disjoint (PF pf) e'
       HDAsrt : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (PBE:assert e1 e2) e'
 
     data _ecomplete : exp → Set where
@@ -168,7 +112,6 @@ module core where
                  e ecomplete →
                  (∀{c rule} → (c , rule) ∈ rules → (rule.branch rule) ecomplete) →
                  case e of⦃· rules ·⦄ ecomplete
-      ECPF   : ∀{pf} → pf pf-complete → (PF pf) ecomplete
       ECAsrt : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (PBE:assert e1 e2) ecomplete
 
     -- type assignment for expressions
@@ -222,7 +165,6 @@ module core where
                  Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
       -- TODO we may have a problem with weakening
       TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
-      TAPF   : ∀{Δ Σ' Γ pf τ} → Σ' ⊢ PF pf :· τ → Δ , Σ' , Γ ⊢ PF pf :: τ
       TAAsrt : ∀{Δ Σ' Γ e1 e2 τ} →
                  holes-disjoint e1 e2 →
                  Δ , Σ' , Γ ⊢ e1 :: τ →
@@ -253,7 +195,6 @@ module core where
       fst              : result → result
       snd              : result → result
       [_]case_of⦃·_·⦄ : env → result → rule ctx → result
-      PF              : pf → result
 
     -- values are final and complete (i.e. they have no holes)
     data _value : result → Set where
@@ -262,7 +203,6 @@ module core where
       VUnit : ⟨⟩ value
       VPair : ∀{r1 r2} → r1 value → r2 value → ⟨ r1 , r2 ⟩ value
       VCon  : ∀{c r} → r value → (C[ c ] r) value
-      VPF   : ∀{pf} → pf pf-value → (PF pf) value
 
     -- final results are those that cannot be evaluated further
     data _final : result → Set where
@@ -276,7 +216,6 @@ module core where
       FFst  : ∀{r} → r final → (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) → (fst r) final
       FSnd  : ∀{r} → r final → (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) → (snd r) final
       FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → E env-final → [ E ]case r of⦃· rules ·⦄ final
-      FPF   : ∀{pf} → pf pf-final → (PF pf) final
 
     data _rcomplete : result → Set where
       RCLam  : ∀{E x e} → E env-complete → e ecomplete → ([ E ]λ x => e) rcomplete
@@ -292,7 +231,6 @@ module core where
                  r rcomplete →
                  (∀{c rule} → (c , rule) ∈ rules → (rule.branch rule) ecomplete) →
                  [ E ]case r of⦃· rules ·⦄ rcomplete
-      RCPF   : ∀{pf} → pf pf-complete → (PF pf) rcomplete
 
     data _,_,_⊢_ : hctx → denv → tctx → env → Set where
       EnvId  : ∀{Δ Σ'} → Δ , Σ' , ∅ ⊢ ∅
@@ -349,17 +287,15 @@ module core where
                  (u , (Γ , τ)) ∈ Δ →
                  Δ , Σ' , Γ ⊢ E →
                  Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
-      TAPF   : ∀{Δ Σ' pf τ} →
-                 Σ' ⊢ PF pf :· τ →
-                 Δ , Σ' ⊢ PF pf ·: τ
 
   world       = env ∧ ex
   worlds      = List world
   constraints = List (Nat ∧ world)
 
   data Constraints⦃_,_⦄:=_ : result → result → constraints → Set where
-    XCEx     : ∀{E u pf} → Constraints⦃ [ E ]??[ u ] , PF pf ⦄:= ((u , E , PF pf) :: [])
-    XCExSymm : ∀{E u pf} → Constraints⦃ PF pf , [ E ]??[ u ] ⦄:= ((u , E , PF pf) :: [])
+    -- TODO we need to revive these rules in the commit that coerces results to examples
+    -- XCEx     : ∀{E u pf} → Constraints⦃ [ E ]??[ u ] , PF pf ⦄:= ((u , E , PF pf) :: [])
+    -- XCExSymm : ∀{E u pf} → Constraints⦃ PF pf , [ E ]??[ u ] ⦄:= ((u , E , PF pf) :: [])
     XCExRefl : ∀{r} → Constraints⦃ r , r ⦄:= []
     XCUnit   : Constraints⦃ ⟨⟩ , ⟨⟩ ⦄:= []
     XCPair   : ∀{r1 r2 r'1 r'2 k1 k2} →
@@ -388,7 +324,6 @@ module core where
 
   Constraints⦃_,_⦄:=∅ : result → result → Set
   Constraints⦃ r1 , r2 ⦄:=∅ = Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄:= k → ⊥
-
 
   data Fuel : Set where
     ∞ : Fuel
@@ -461,7 +396,6 @@ module core where
                          E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
                          (∀{c e'} → r ≠ (C[ c ] e')) →
                          E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
-    EPF              : ∀{E ⛽ pf} → (E ⊢ PF pf ⌊ ⛽ ⌋⇒ PF pf ⊣ [])
     EAsrt            : ∀{E ⛽ e1 r1 k1 e2 r2 k2 k3} →
                          E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
                          E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
@@ -545,32 +479,19 @@ module core where
   -- TODO proof that if _·⊨ v, then v value
   data _·⊨_ : ex → result → Set where
     SCtor : ∀{ex v c} →
-              v value →
               ex ·⊨ v →
               (C[ c ] ex) ·⊨ (C[ c ] v)
     SUnit : ⟨⟩ ·⊨ ⟨⟩
     SPair : ∀{ex1 ex2 v1 v2} →
-              v1 value →
-              v2 value →
               ex1 ·⊨ v1 →
               ex2 ·⊨ v2 →
               ⟨ ex1 , ex2 ⟩ ·⊨ ⟨ v1 , v2 ⟩
-    SPF   : ∀{E pf x e} →
-              (∀{i v ex} →
-                 pf ⟦ i ⟧ == Some (v , ex) →
-                 Σ[ v' ∈ result ] Σ[ k ∈ constraints ] (
-                    (E ,, (x , v)) ⊢ e ⇒ v' ⊣ k ∧
-                    v' value ∧
-                    ex ·⊨ v')) →
-              PF pf ·⊨ ([ E ]λ x => e)
-    -- TODO SPFFix
 
   data _⊨_ : worlds → exp → Set where
     SEmpty : ∀{e} → [] ⊨ e
     SWorld : ∀{W E k ex v e} →
                W ⊨ e →
                E ⊢ e ⇒ v ⊣ k →
-               v value →
                ex ·⊨ v →
                ((E , ex) :: W) ⊨ e
 
@@ -591,24 +512,6 @@ module core where
                  Σ' , Γ , (zip Es ex1s) ⊢ τ1 ↑ e1 →
                  Σ' , Γ , (zip Es ex2s) ⊢ τ2 ↑ e2 →
                  Σ' , Γ , W ⊢ ⟨ τ1 × τ2 ⟩ ↑ ⟨ e1 , e2 ⟩
-      IRLam : ∀{Σ' Γ W W' τ1 τ2 ⦇E,pf⦈s x e} →
-                ∥ ⦇E,pf⦈s ∥ == ∥ W ∥ →
-                -- Each example in the worlds is a partial function
-                -- The envs and pfs are destructed and retained in ⦇E,pf⦈s
-                (∀{i E-i ex-i} →
-                   W ⟦ i ⟧ == Some (E-i , ex-i) →
-                   Σ[ pf-i ∈ pf ] (
-                      ex-i == PF pf-i ∧
-                      ⦇E,pf⦈s ⟦ i ⟧ == Some (E-i , pf-i))) →
-                W' == concat
-                        (map (λ {(E , pf) →
-                           map (λ {(v , ex) →
-                             ((E ,, (x , v)) , ex)})
-                             pf})
-                           ⦇E,pf⦈s) →
-                Σ' , (Γ ,, (x , τ1)) , W' ⊢ τ2 ↑ e →
-                Σ' , Γ , W ⊢ τ1 ==> τ2 ↑ (·λ x => e)
-      -- TODO IRFix
       IRMatch : ∀{Σ' Γ W W' W'' τ e rules d cctx x} →
                   -- choose a datatype
                   (d , cctx) ∈ π1 Σ' →

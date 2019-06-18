@@ -119,12 +119,9 @@ module core where
     -- type assignment for expressions
     data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
       TALam  : ∀{Δ Σ' Γ x e τ1 τ2} →
-                 x # Γ →
                  Δ , Σ' , (Γ ,, (x , τ1)) ⊢ e :: τ2 →
                  Δ , Σ' , Γ ⊢ ·λ x => e :: τ1 ==> τ2
       TAFix  : ∀{Δ Σ' Γ f x e τ1 τ2} →
-                 f # Γ →
-                 x # Γ →
                  Δ , Σ' , (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢ e :: τ2 →
                  Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ1 ==> τ2
       TAVar  : ∀{Δ Σ' Γ x τ} → (x , τ) ∈ Γ → Δ , Σ' , Γ ⊢ X[ x ] :: τ
@@ -157,7 +154,6 @@ module core where
                  (∀{c} → dom cctx c → dom rules c) →
                  (∀{c xc ec} →
                     (c , |C xc => ec) ∈ rules →
-                      xc # Γ ∧
                       holes-disjoint ec e ∧
                       (∀{c' xc' ec'} → (c' , |C xc' => ec') ∈ rules → c ≠ c' → holes-disjoint ec ec') ∧
                       -- The constructor of each rule must be of the right datatype, and the branch must type-check
@@ -276,7 +272,6 @@ module core where
                  (∀{c} → dom cctx c → dom rules c) →
                  (∀{c xc ec} →
                     (c , |C xc => ec) ∈ rules →
-                      xc # Γ ∧
                       -- The constructor of each rule must be of the right datatype, and the branch must type-check
                       Σ[ τc ∈ typ ] (
                          (c , τc) ∈ cctx ∧

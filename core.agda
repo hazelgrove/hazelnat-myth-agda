@@ -292,10 +292,23 @@ module core where
   worlds      = List world
   constraints = List (Nat ∧ world)
 
+  data Coerce_:=_ : result → ex → Set where
+    CoerceUnit : Coerce ⟨⟩ := ⟨⟩
+    CoercePair : ∀{r1 r2 ex1 ex2} →
+                   Coerce r1 := ex1 →
+                   Coerce r2 := ex2 →
+                   Coerce ⟨ r1 , r2 ⟩ := ⟨ ex1 , ex2 ⟩
+    CoerceCtor : ∀{c r ex} →
+                   Coerce r := ex →
+                   Coerce C[ c ] r := C[ c ] ex
+
   data Constraints⦃_,_⦄:=_ : result → result → constraints → Set where
-    -- TODO we need to revive these rules in the commit that coerces results to examples
-    -- XCEx     : ∀{E u pf} → Constraints⦃ [ E ]??[ u ] , PF pf ⦄:= ((u , E , PF pf) :: [])
-    -- XCExSymm : ∀{E u pf} → Constraints⦃ PF pf , [ E ]??[ u ] ⦄:= ((u , E , PF pf) :: [])
+    XCEx     : ∀{E u r ex} →
+                 Coerce r := ex →
+                 Constraints⦃ [ E ]??[ u ] , r ⦄:= ((u , E , ex) :: [])
+    XCExSymm : ∀{E u r ex} →
+                 Coerce r := ex →
+                 Constraints⦃ r , [ E ]??[ u ] ⦄:= ((u , E , ex) :: [])
     XCExRefl : ∀{r} → Constraints⦃ r , r ⦄:= []
     XCUnit   : Constraints⦃ ⟨⟩ , ⟨⟩ ⦄:= []
     XCPair   : ∀{r1 r2 r'1 r'2 k1 k2} →

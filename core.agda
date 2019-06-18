@@ -29,6 +29,7 @@ module core where
       ⟨⟩    : ex
       ⟨_,_⟩ : ex → ex → ex
       C[_]_ : Nat → ex → ex
+      ¿¿    : ex
 
     data _⊢_:·_ : denv → ex → typ → Set where
       TAUnit : ∀{Σ'} → Σ' ⊢ ⟨⟩ :· ⟨⟩
@@ -41,6 +42,7 @@ module core where
                  (c , τ) ∈ cctx →
                  Σ' ⊢ ex :· τ →
                  Σ' ⊢ C[ c ] ex :· D[ d ]
+      TADC   : ∀{Σ' τ} → Σ' ⊢ ¿¿ :· τ
 
     record rule : Set where
       inductive
@@ -472,7 +474,7 @@ module core where
 
   -- synthesis
 
-  -- TODO proof that if _·⊨ v, then v value
+  -- TODO this will be replaced by backpropagation
   data _·⊨_ : ex → result → Set where
     SCtor : ∀{ex v c} →
               ex ·⊨ v →

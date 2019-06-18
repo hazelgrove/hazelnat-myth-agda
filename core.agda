@@ -319,21 +319,6 @@ module core where
                  (_==_ {A = result} (C[ c ] r1) (C[ c ] r2) → ⊥) →
                  Constraints⦃ r1 , r2 ⦄:= k →
                  Constraints⦃ C[ c ] r1 , C[ c ] r2 ⦄:= k
-    XCAp     : ∀{rf1 rarg1 rf2 rarg2 kf karg} →
-                 (_==_ {A = result} (rf1 ∘ rarg1) (rf2 ∘ rarg2) → ⊥) →
-                 Constraints⦃ rf1 , rf2 ⦄:= kf →
-                 Constraints⦃ rarg1 , rarg2 ⦄:= karg →
-                 Constraints⦃ rf1 ∘ rarg1 , rf2 ∘ rarg2 ⦄:= kf ++ karg
-    XCFst    : ∀{r r' k} →
-                 Constraints⦃ r , r' ⦄:= k →
-                 Constraints⦃ fst r , fst r' ⦄:= k
-    XCSnd    : ∀{r r' k} →
-                 Constraints⦃ r , r' ⦄:= k →
-                 Constraints⦃ snd r , snd r' ⦄:= k
-    XCMatch  : ∀{E rules r1 r2 k} →
-                 (_==_ {A = result} [ E ]case r1 of⦃· rules ·⦄ [ E ]case r2 of⦃· rules ·⦄ → ⊥) →
-                 Constraints⦃ r1 , r2 ⦄:= k →
-                 Constraints⦃ [ E ]case r1 of⦃· rules ·⦄ , [ E ]case r2 of⦃· rules ·⦄ ⦄:= k
 
   Constraints⦃_,_⦄:=∅ : result → result → Set
   Constraints⦃ r1 , r2 ⦄:=∅ = Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄:= k → ⊥

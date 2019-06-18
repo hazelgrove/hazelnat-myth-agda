@@ -165,7 +165,6 @@ module core where
                          (c , τc) ∈ cctx ∧
                          Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
                  Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
-      -- TODO we may have a problem with weakening
       TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
       TAAsrt : ∀{Δ Σ' Γ e1 e2 τ} →
                  holes-disjoint e1 e2 →

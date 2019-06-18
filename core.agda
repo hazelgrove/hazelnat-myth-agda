@@ -522,6 +522,7 @@ module core where
                      W ⟦ i ⟧ == Some (E , ex) →
                      Σ[ c ∈ Nat ] Σ[ v ∈ result ] (
                        dom cctx c ∧
+                       -- TODO reconsider the value-ness of this
                        v value ∧
                        W' ⟦ i ⟧ == Some (c , E , ex , v) ∧
                        E ⊢ e ⇒ C[ c ] v ⊣ [])) →

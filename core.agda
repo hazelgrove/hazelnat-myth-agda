@@ -180,9 +180,6 @@ module core where
     data _env-final : env → Set where
       EF : ∀{E} → (∀{x rx} → (x , rx) ∈ E → rx final) → E env-final
 
-    data _env-values : env → Set where
-      EF : ∀{E} → (∀{x rx} → (x , rx) ∈ E → rx value) → E env-values
-
     -- results - evaluation takes expressions to results, but results aren't necessarily final
     data result : Set where
       [_]λ_=>_         : env → Nat → exp → result
@@ -196,10 +193,10 @@ module core where
       snd              : result → result
       [_]case_of⦃·_·⦄ : env → result → rule ctx → result
 
-    -- values are final and complete (i.e. they have no holes)
+    -- values are final and almost complete (i.e. they can only have holes in environments or under binders)
     data _value : result → Set where
-      VLam  : ∀{E x e} → E env-values → e ecomplete → ([ E ]λ x => e) value
-      VFix  : ∀{E f x e} → E env-values → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ value
+      VLam  : ∀{E x e} → E env-final → ([ E ]λ x => e) value
+      VFix  : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ value
       VUnit : ⟨⟩ value
       VPair : ∀{r1 r2} → r1 value → r2 value → ⟨ r1 , r2 ⟩ value
       VCon  : ∀{c r} → r value → (C[ c ] r) value
@@ -217,6 +214,7 @@ module core where
       FSnd  : ∀{r} → r final → (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) → (snd r) final
       FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → E env-final → [ E ]case r of⦃· rules ·⦄ final
 
+    -- complete results have no holes at all
     data _rcomplete : result → Set where
       RCLam  : ∀{E x e} → E env-complete → e ecomplete → ([ E ]λ x => e) rcomplete
       RCFix  : ∀{E f x e} → E env-complete → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ rcomplete

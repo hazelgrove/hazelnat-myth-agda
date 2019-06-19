@@ -15,6 +15,7 @@ module core where
   infixr 25  _==>_
 
   tctx = typ ctx
+  -- TODO we should restrict this to exclude arrow types
   hctx = (tctx ∧ typ) ctx
   denv = Σ[ dctx ∈ tctx ctx ]
     ∀{d1 d2 cctx1 cctx2 c} →
@@ -30,19 +31,25 @@ module core where
       ⟨_,_⟩ : ex → ex → ex
       C[_]_ : Nat → ex → ex
       ¿¿    : ex
+      _↦_  : result → ex → ex
 
-    data _⊢_:·_ : denv → ex → typ → Set where
-      TAUnit : ∀{Σ'} → Σ' ⊢ ⟨⟩ :· ⟨⟩
-      TAPair : ∀{Σ' ex1 ex2 τ1 τ2} →
-                 Σ' ⊢ ex1 :· τ1 →
-                 Σ' ⊢ ex2 :· τ2 →
-                 Σ' ⊢ ⟨ ex1 , ex2 ⟩ :· ⟨ τ1 × τ2 ⟩
-      TACtor : ∀{Σ' d cctx c ex τ} →
+    data _,_⊢_:·_ : hctx → denv → ex → typ → Set where
+      TAUnit : ∀{Δ Σ'} → Δ , Σ' ⊢ ⟨⟩ :· ⟨⟩
+      TAPair : ∀{Δ Σ' ex1 ex2 τ1 τ2} →
+                 Δ , Σ' ⊢ ex1 :· τ1 →
+                 Δ , Σ' ⊢ ex2 :· τ2 →
+                 Δ , Σ' ⊢ ⟨ ex1 , ex2 ⟩ :· ⟨ τ1 × τ2 ⟩
+      TACtor : ∀{Δ Σ' d cctx c ex τ} →
                  (d , cctx) ∈ π1 Σ' →
                  (c , τ) ∈ cctx →
-                 Σ' ⊢ ex :· τ →
-                 Σ' ⊢ C[ c ] ex :· D[ d ]
-      TADC   : ∀{Σ' τ} → Σ' ⊢ ¿¿ :· τ
+                 Δ , Σ' ⊢ ex :· τ →
+                 Δ , Σ' ⊢ C[ c ] ex :· D[ d ]
+      TADC   : ∀{Δ Σ' τ} → Δ , Σ' ⊢ ¿¿ :· τ
+      TAMap  : ∀{Δ Σ' v ex τ1 τ2} →
+                 v value →
+                 Δ , Σ' ⊢ v ·: τ1 →
+                 Δ , Σ' ⊢ ex :· τ2 →
+                 Δ , Σ' ⊢ v ↦ ex :· τ1 ==> τ2
 
     record rule : Set where
       inductive
@@ -184,6 +191,7 @@ module core where
       ⟨⟩               : result
       ⟨_,_⟩            : result → result → result
       C[_]_            : Nat → result → result
+      C⁻[_]_           : Nat → result → result
       [_]??[_]         : env → Nat → result
       _∘_              : result → result → result
       fst              : result → result
@@ -236,55 +244,65 @@ module core where
 
     -- type assignment for results
     data _,_⊢_·:_ : hctx → denv → result → typ → Set where
-      TALam  : ∀{Δ Σ' Γ E x e τ} →
-                 Δ , Σ' , Γ ⊢ E →
-                 Δ , Σ' , Γ ⊢ ·λ x => e :: τ →
-                 Δ , Σ' ⊢ [ E ]λ x => e ·: τ
-      TAFix  : ∀{Δ Σ' Γ E f x e τ} →
-                 Δ , Σ' , Γ ⊢ E →
-                 Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ →
-                 Δ , Σ' ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ·: τ
-      TAApp  : ∀{Δ Σ' f arg τ1 τ2} →
-                 Δ , Σ' ⊢ f ·: τ1 ==> τ2 →
-                 Δ , Σ' ⊢ arg ·: τ1 →
-                 Δ , Σ' ⊢ f ∘ arg ·: τ2
-      TAUnit : ∀{Δ Σ'} → Δ , Σ' ⊢ ⟨⟩ ·: ⟨⟩
-      TAPair : ∀{Δ Σ' r1 r2 τ1 τ2} →
-                 Δ , Σ' ⊢ r1 ·: τ1 →
-                 Δ , Σ' ⊢ r2 ·: τ2 →
-                 Δ , Σ' ⊢ ⟨ r1 , r2 ⟩ ·: ⟨ τ1 × τ2 ⟩
-      TAFst  : ∀{Δ Σ' r τ1 τ2} →
-                 Δ , Σ' ⊢ r ·: ⟨ τ1 × τ2 ⟩ →
-                 Δ , Σ' ⊢ fst r ·: τ1
-      TASnd  : ∀{Δ Σ' r τ1 τ2} →
-                 Δ , Σ' ⊢ r ·: ⟨ τ1 × τ2 ⟩ →
-                 Δ , Σ' ⊢ snd r ·: τ2
-      TACtor : ∀{Δ Σ' d cctx c r τ} →
-                 (d , cctx) ∈ π1 Σ' →
-                 (c , τ) ∈ cctx →
-                 Δ , Σ' ⊢ r ·: τ →
-                 Δ , Σ' ⊢ C[ c ] r ·: D[ d ]
-      TACase : ∀{Δ Σ' Γ E d cctx r rules τ} →
-                 (d , cctx) ∈ π1 Σ' →
-                 Δ , Σ' , Γ ⊢ E →
-                 Δ , Σ' ⊢ r ·: D[ d ] →
-                 -- There must be a rule for each constructor, i.e. case exhaustiveness
-                 (∀{c} → dom cctx c → dom rules c) →
-                 (∀{c xc ec} →
-                    (c , |C xc => ec) ∈ rules →
-                      -- The constructor of each rule must be of the right datatype, and the branch must type-check
-                      Σ[ τc ∈ typ ] (
-                         (c , τc) ∈ cctx ∧
-                         Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
-                 Δ , Σ' ⊢ [ E ]case r of⦃· rules ·⦄ ·: τ
-      TAHole : ∀{Δ Σ' Γ E u τ} →
-                 (u , (Γ , τ)) ∈ Δ →
-                 Δ , Σ' , Γ ⊢ E →
-                 Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
+      TALam        : ∀{Δ Σ' Γ E x e τ} →
+                       Δ , Σ' , Γ ⊢ E →
+                       Δ , Σ' , Γ ⊢ ·λ x => e :: τ →
+                       Δ , Σ' ⊢ [ E ]λ x => e ·: τ
+      TAFix        : ∀{Δ Σ' Γ E f x e τ} →
+                       Δ , Σ' , Γ ⊢ E →
+                       Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ →
+                       Δ , Σ' ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ·: τ
+      TAApp        : ∀{Δ Σ' f arg τ1 τ2} →
+                       Δ , Σ' ⊢ f ·: τ1 ==> τ2 →
+                       Δ , Σ' ⊢ arg ·: τ1 →
+                       Δ , Σ' ⊢ f ∘ arg ·: τ2
+      TAUnit       : ∀{Δ Σ'} → Δ , Σ' ⊢ ⟨⟩ ·: ⟨⟩
+      TAPair       : ∀{Δ Σ' r1 r2 τ1 τ2} →
+                       Δ , Σ' ⊢ r1 ·: τ1 →
+                       Δ , Σ' ⊢ r2 ·: τ2 →
+                       Δ , Σ' ⊢ ⟨ r1 , r2 ⟩ ·: ⟨ τ1 × τ2 ⟩
+      TAFst        : ∀{Δ Σ' r τ1 τ2} →
+                       Δ , Σ' ⊢ r ·: ⟨ τ1 × τ2 ⟩ →
+                       Δ , Σ' ⊢ fst r ·: τ1
+      TASnd        : ∀{Δ Σ' r τ1 τ2} →
+                       Δ , Σ' ⊢ r ·: ⟨ τ1 × τ2 ⟩ →
+                       Δ , Σ' ⊢ snd r ·: τ2
+      TACtor       : ∀{Δ Σ' d cctx c r τ} →
+                       (d , cctx) ∈ π1 Σ' →
+                       (c , τ) ∈ cctx →
+                       Δ , Σ' ⊢ r ·: τ →
+                       Δ , Σ' ⊢ C[ c ] r ·: D[ d ]
+      TAUnwrapCtor : ∀{Δ Σ' d cctx c r τ} →
+                       (d , cctx) ∈ π1 Σ' →
+                       (c , τ) ∈ cctx →
+                       Δ , Σ' ⊢ r ·: D[ d ] →
+                       Δ , Σ' ⊢ C⁻[ c ] r ·: τ
+      TACase       : ∀{Δ Σ' Γ E d cctx r rules τ} →
+                       (d , cctx) ∈ π1 Σ' →
+                       Δ , Σ' , Γ ⊢ E →
+                       Δ , Σ' ⊢ r ·: D[ d ] →
+                       -- There must be a rule for each constructor, i.e. case exhaustiveness
+                       (∀{c} → dom cctx c → dom rules c) →
+                       (∀{c xc ec} →
+                          (c , |C xc => ec) ∈ rules →
+                            -- The constructor of each rule must be of the right datatype, and the branch must type-check
+                            Σ[ τc ∈ typ ] (
+                               (c , τc) ∈ cctx ∧
+                               Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
+                       Δ , Σ' ⊢ [ E ]case r of⦃· rules ·⦄ ·: τ
+      TAHole       : ∀{Δ Σ' Γ E u τ} →
+                       (u , (Γ , τ)) ∈ Δ →
+                       Δ , Σ' , Γ ⊢ E →
+                       Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
 
   world       = env ∧ ex
   worlds      = List world
   constraints = List (Nat ∧ world)
+
+  not-both-pair : (r r' : result) → Set
+  not-both-pair r r' = (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩)  ∨ (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩)
+  not-both-ctor : (r r' : result) → Set
+  not-both-ctor r r' = (∀{c r''} → r ≠ (C[ c ] r'')) ∨ (∀{c r''} → r' ≠ (C[ c ] r''))
 
   data Coerce_:=_ : result → ex → Set where
     CoerceUnit : Coerce ⟨⟩ := ⟨⟩
@@ -296,27 +314,15 @@ module core where
                    Coerce r := ex →
                    Coerce C[ c ] r := C[ c ] ex
 
-  data Constraints⦃_,_⦄:=_ : result → result → constraints → Set where
-    XCEx     : ∀{E u r ex} →
-                 Coerce r := ex →
-                 Constraints⦃ [ E ]??[ u ] , r ⦄:= ((u , E , ex) :: [])
-    XCExSymm : ∀{E u r ex} →
-                 Coerce r := ex →
-                 Constraints⦃ r , [ E ]??[ u ] ⦄:= ((u , E , ex) :: [])
-    XCExRefl : ∀{r} → Constraints⦃ r , r ⦄:= []
-    XCUnit   : Constraints⦃ ⟨⟩ , ⟨⟩ ⦄:= []
-    XCPair   : ∀{r1 r2 r'1 r'2 k1 k2} →
-                 Constraints⦃ r1 , r'1 ⦄:= k1 →
-                 Constraints⦃ r2 , r'2 ⦄:= k2 →
-                 Constraints⦃ ⟨ r1 , r2 ⟩ , ⟨ r'1 , r'2 ⟩ ⦄:= k1 ++ k2
-    XCCTor   : ∀{c r1 r2 k} →
-                 (_==_ {A = result} (C[ c ] r1) (C[ c ] r2) → ⊥) →
-                 Constraints⦃ r1 , r2 ⦄:= k →
-                 Constraints⦃ C[ c ] r1 , C[ c ] r2 ⦄:= k
-
-  Constraints⦃_,_⦄:=∅ : result → result → Set
-  Constraints⦃ r1 , r2 ⦄:=∅ = Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄:= k → ⊥
-
+  -- The evaluation, constraint collection, and backpropagation judgments accept "fuel",
+  -- which defines whether or not they can recurse indefinitely, and, if not, then the
+  -- numerical limit. The limit is not on the recursion depth, but rather on the number
+  -- of "beta reductions", interpreted a bit loosely to include case evaluations.
+  -- - If ⌊ ⛽ ⌋ is ∞, then there is no beta reduction limit,
+  --   but the judgment will not be satisfied unless evaluation eventually terminates.
+  -- - If ⌊ ⛽ ⌋ is ⛽⟨ n ⟩, then the beta reduction limit is at most n,
+  --   but if the limit is reached, the evaluation and backpropagation judgments are
+  --   satisfied automatically, whereas other judgments fail automatically
   data Fuel : Set where
     ∞ : Fuel
     ⛽⟨_⟩ : Nat → Fuel
@@ -325,139 +331,349 @@ module core where
     CF∞ : ∞ ⛽⇓ ∞
     CF⛽ : ∀{n} → ⛽⟨ 1+ n ⟩ ⛽⇓ ⛽⟨ n ⟩
 
-  -- Generic big step evaluation
-  -- - If ⌊ ⛽ ⌋ is ∞, then there is no beta reduction limit,
-  --   but the judgment will not go through unless evaluation eventually terminates.
-  -- - If ⌊ ⛽ ⌋ is ⛽⟨ n ⟩, then the beta reduction limit is at most n,
-  --   but if the limit is reached, the judgment will go through automatically.
-  -- - Note that I'm using the term "beta reduction" a little loosely, as case
-  --   evaluation also counts
-  data _⊢_⌊_⌋⇒_⊣_ : env → exp → Fuel → result → constraints → Set where
-    EFun             : ∀{E ⛽ x e} → E ⊢ ·λ x => e ⌊ ⛽ ⌋⇒ [ E ]λ x => e ⊣ []
-    EFix             : ∀{E ⛽ f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
-    EVar             : ∀{E ⛽ x r} → (x , r) ∈ E → E ⊢ X[ x ] ⌊ ⛽ ⌋⇒ r ⊣ []
-    EHole            : ∀{E ⛽ u} → E ⊢ ??[ u ] ⌊ ⛽ ⌋⇒ [ E ]??[ u ] ⊣ []
-    EUnit            : ∀{E ⛽} → E ⊢ ⟨⟩ ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ []
-    EPair            : ∀{E ⛽ e1 e2 r1 r2 k1 k2} →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                         E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ k1 ++ k2
-    ECtor            : ∀{E ⛽ c e r k} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
-                         E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ k
-    EApp             : ∀{E ⛽ ⛽↓ e1 e2 Ef x ef kf r2 k2 r k} →
-                         ⛽ ⛽⇓ ⛽↓ →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ kf →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                         (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ k →
-                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ kf ++ k2 ++ k
-    EAppFix          : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2 r k} →
-                         ⛽ ⛽⇓ ⛽↓ →
-                         r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                         (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ k →
-                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ k1 ++ k2 ++ k
-    EAppUnfinished   : ∀{E ⛽ e1 e2 r1 k1 r2 k2} →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                         (∀{Ef x ef} → r1 ≠ ([ Ef ]λ x => ef)) →
-                         (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ k1 ++ k2
-    EFst             : ∀{E ⛽ e r1 r2 k} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ k →
-                         E ⊢ fst e ⌊ ⛽ ⌋⇒ r1 ⊣ k
-    ESnd             : ∀{E ⛽ e r1 r2 k} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ k →
-                         E ⊢ snd e ⌊ ⛽ ⌋⇒ r2 ⊣ k
-    EFstUnfinished   : ∀{E ⛽ e r k} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
-                         (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
-                         E ⊢ fst e ⌊ ⛽ ⌋⇒ fst r ⊣ k
-    ESndUnfinished   : ∀{E ⛽ e r k} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
-                         (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
-                         E ⊢ snd e ⌊ ⛽ ⌋⇒ snd r ⊣ k
-    EMatch           : ∀{E ⛽ ⛽↓ e rules c xc ec r' k' r k} →
-                         ⛽ ⛽⇓ ⛽↓ →
-                         (c , |C xc => ec) ∈ rules →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
-                         (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒ r ⊣ k →
-                         E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ r ⊣ k' ++ k
-    EMatchUnfinished : ∀{E ⛽ e rules r k} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
-                         (∀{c e'} → r ≠ (C[ c ] e')) →
-                         E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
-    EAsrt            : ∀{E ⛽ e1 r1 k1 e2 r2 k2 k3} →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                         Constraints⦃ r1 , r2 ⦄:= k3 →
-                         E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ k1 ++ k2 ++ k3
-    ELimit           : ∀{E e r} → E ⊢ e ⌊ ⛽⟨ 0 ⟩ ⌋⇒ r ⊣ []
+  mutual
+    -- constraint collection
+    data Constraints⦃_,_⦄⌊_⌋:=_ : result → result → Fuel → constraints → Set where
+      XCExRefl    : ∀{⛽ r} → Constraints⦃ r , r ⦄⌊ ⛽ ⌋:= []
+      XCPair      : ∀{⛽ r1 r2 r'1 r'2 k1 k2} →
+                      (_==_ {A = result} ⟨ r1 , r2 ⟩ ⟨ r'1 , r'2 ⟩ → ⊥) →
+                      Constraints⦃ r1 , r'1 ⦄⌊ ⛽ ⌋:= k1 →
+                      Constraints⦃ r2 , r'2 ⦄⌊ ⛽ ⌋:= k2 →
+                      Constraints⦃ ⟨ r1 , r2 ⟩ , ⟨ r'1 , r'2 ⟩ ⦄⌊ ⛽ ⌋:= k1 ++ k2
+      XCCtor      : ∀{⛽ c r r' k} →
+                      (_==_ {A = result} (C[ c ] r) (C[ c ] r') → ⊥) →
+                      Constraints⦃ r , r' ⦄⌊ ⛽ ⌋:= k →
+                      Constraints⦃ C[ c ] r , C[ c ] r' ⦄⌊ ⛽ ⌋:= k
+      XCBackProp1 : ∀{⛽ ex k} {r r' : result} →
+                      r ≠ r' →
+                      not-both-pair r r' →
+                      not-both-ctor r r' →
+                      Coerce r' := ex →
+                      r ⇐ ex ⌊ ⛽ ⌋:= k →
+                      Constraints⦃ r , r' ⦄⌊ ⛽ ⌋:= k
+      XCBackProp2 : ∀{⛽ r r' ex k} →
+                      r ≠ r' →
+                      not-both-pair r r' →
+                      not-both-ctor r r' →
+                      Coerce r := ex →
+                      r' ⇐ ex ⌊ ⛽ ⌋:= k →
+                      Constraints⦃ r , r' ⦄⌊ ⛽ ⌋:= k
+
+    -- TODO we need a theorem that constraints cannot generate spurious hole names.
+    -- generally, all the steps from an exp to an something with holes should not contain hole names
+    -- not in the original exp, and the process as a whole should also not produce spurious names
+    -- this realization probably means there are other important theorems that have been missed
+
+    -- TODO we should have theorems that constrain where don't cares and such can be found.
+    -- Don't cares should only be generated in backprop and should not appear anywhere else.
+    -- currently they don't type-check, tho we may have to change that later, idk.
+
+    -- TODO we should also have similar to the above for C⁻
+
+    -- backpropagation
+    data _⇐_⌊_⌋:=_ : result → ex → Fuel → constraints → Set where
+      XBNone       : ∀{⛽ r} → r ⇐ ¿¿ ⌊ ⛽ ⌋:= []
+      XBHole       : ∀{⛽ E u ex} →
+                       ex ≠ ¿¿ →
+                       (∀{v ex'} → ex ≠ (v ↦ ex')) →
+                       [ E ]??[ u ] ⇐ ex ⌊ ⛽ ⌋:= ((u , E , ex) :: [])
+      XBApp        : ∀{⛽ r v ex k} →
+                       ex ≠ ¿¿ →
+                       v value →
+                       r ⇐ v ↦ ex ⌊ ⛽ ⌋:= k →
+                       (r ∘ v) ⇐ ex ⌊ ⛽ ⌋:= k
+      XBFun        : ∀{⛽ ⛽↓ E x e v ex r k1 k2} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       (E ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒ r ⊣ k1 →
+                       r ⇐ ex ⌊ ⛽↓ ⌋:= k2 →
+                       ([ E ]λ x => e) ⇐ v ↦ ex ⌊ ⛽ ⌋:= k1 ++ k2
+      XBFix        : ∀{⛽ ⛽↓ E f x e rf v ex r k1 k2} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       rf == [ E ]fix f ⦇·λ x => e ·⦈ →
+                       (E ,, (f , rf) ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒ r ⊣ k1 →
+                       r ⇐ ex ⌊ ⛽↓ ⌋:= k2 →
+                       rf ⇐ v ↦ ex ⌊ ⛽ ⌋:= k1 ++ k2
+      XBFst        : ∀{⛽ r ex1 k} →
+                       ex1 ≠ ¿¿ →
+                       r ⇐ ⟨ ex1 , ¿¿ ⟩ ⌊ ⛽ ⌋:= k →
+                       fst r ⇐ ex1 ⌊ ⛽ ⌋:= k
+      XBSnd        : ∀{⛽ r ex2 k} →
+                       ex2 ≠ ¿¿ →
+                       r ⇐ ⟨ ¿¿ , ex2 ⟩ ⌊ ⛽ ⌋:= k →
+                       snd r ⇐ ex2 ⌊ ⛽ ⌋:= k
+      XBMatch      : ∀{⛽ ⛽↓ E r rules ex c-j x-j e-j r-j k1 k2 k3} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       ex ≠ ¿¿ →
+                       (c-j , |C x-j => e-j) ∈ rules →
+                       r ⇐ C[ c-j ] ¿¿ ⌊ ⛽ ⌋:= k1 →
+                       (E ,, (x-j , C⁻[ c-j ] r)) ⊢ e-j ⌊ ⛽↓ ⌋⇒ r-j ⊣ k2 →
+                       r-j ⇐ ex ⌊ ⛽↓ ⌋:= k3 →
+                       [ E ]case r of⦃· rules ·⦄ ⇐ ex ⌊ ⛽ ⌋:= k1 ++ k2 ++ k3
+      XBUnwrapCtor : ∀{⛽ c r ex k} →
+                       ex ≠ ¿¿ →
+                       r ⇐ C[ c ] ex ⌊ ⛽ ⌋:= k →
+                       (C⁻[ c ] r) ⇐ ex ⌊ ⛽ ⌋:= k
+      XBUnit       : ∀{⛽} → ⟨⟩ ⇐ ⟨⟩ ⌊ ⛽ ⌋:= []
+      XBPair       : ∀{⛽ r1 r2 ex1 ex2 k1 k2} →
+                       r1 ⇐ ex1 ⌊ ⛽ ⌋:= k1 →
+                       r2 ⇐ ex2 ⌊ ⛽ ⌋:= k2 →
+                       ⟨ r1 , r2 ⟩ ⇐ ⟨ ex1 , ex2 ⟩ ⌊ ⛽ ⌋:= k1 ++ k2
+      XBCtor       : ∀{⛽ c r ex k} →
+                       r ⇐ ex ⌊ ⛽ ⌋:= k →
+                       (C[ c ] r) ⇐ C[ c ] ex ⌊ ⛽ ⌋:= k
+      XBLimit      : ∀{r ex} → r ⇐ ex ⌊ ⛽⟨ 0 ⟩ ⌋:= []
+
+    -- Generic big step evaluation
+    data _⊢_⌊_⌋⇒_⊣_ : env → exp → Fuel → result → constraints → Set where
+      EFun             : ∀{E ⛽ x e} → E ⊢ ·λ x => e ⌊ ⛽ ⌋⇒ [ E ]λ x => e ⊣ []
+      EFix             : ∀{E ⛽ f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
+      EVar             : ∀{E ⛽ x r} → (x , r) ∈ E → E ⊢ X[ x ] ⌊ ⛽ ⌋⇒ r ⊣ []
+      EHole            : ∀{E ⛽ u} → E ⊢ ??[ u ] ⌊ ⛽ ⌋⇒ [ E ]??[ u ] ⊣ []
+      EUnit            : ∀{E ⛽} → E ⊢ ⟨⟩ ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ []
+      EPair            : ∀{E ⛽ e1 e2 r1 r2 k1 k2} →
+                           E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                           E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                           E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ k1 ++ k2
+      ECtor            : ∀{E ⛽ c e r k} →
+                           E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
+                           E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ k
+      EApp             : ∀{E ⛽ ⛽↓ e1 e2 Ef x ef kf r2 k2 r k} →
+                           ⛽ ⛽⇓ ⛽↓ →
+                           E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ kf →
+                           E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                           (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ k →
+                           E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ kf ++ k2 ++ k
+      EAppFix          : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2 r k} →
+                           ⛽ ⛽⇓ ⛽↓ →
+                           r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                           E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                           E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                           (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ k →
+                           E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ k1 ++ k2 ++ k
+      EAppUnfinished   : ∀{E ⛽ e1 e2 r1 k1 r2 k2} →
+                           E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                           (∀{Ef x ef} → r1 ≠ ([ Ef ]λ x => ef)) →
+                           (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
+                           E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                           E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ k1 ++ k2
+      EFst             : ∀{E ⛽ e r1 r2 k} →
+                           E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ k →
+                           E ⊢ fst e ⌊ ⛽ ⌋⇒ r1 ⊣ k
+      ESnd             : ∀{E ⛽ e r1 r2 k} →
+                           E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ k →
+                           E ⊢ snd e ⌊ ⛽ ⌋⇒ r2 ⊣ k
+      EFstUnfinished   : ∀{E ⛽ e r k} →
+                           E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
+                           (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
+                           E ⊢ fst e ⌊ ⛽ ⌋⇒ fst r ⊣ k
+      ESndUnfinished   : ∀{E ⛽ e r k} →
+                           E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
+                           (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
+                           E ⊢ snd e ⌊ ⛽ ⌋⇒ snd r ⊣ k
+      EMatch           : ∀{E ⛽ ⛽↓ e rules c xc ec r' k' r k} →
+                           ⛽ ⛽⇓ ⛽↓ →
+                           (c , |C xc => ec) ∈ rules →
+                           E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
+                           (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒ r ⊣ k →
+                           E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ r ⊣ k' ++ k
+      EMatchUnfinished : ∀{E ⛽ e rules r k} →
+                           E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
+                           (∀{c e'} → r ≠ (C[ c ] e')) →
+                           E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ [ E ]case r of⦃· rules ·⦄ ⊣ k
+      EAsrt            : ∀{E ⛽ e1 r1 k1 e2 r2 k2 k3} →
+                           E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                           E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                           Constraints⦃ r1 , r2 ⦄⌊ ⛽ ⌋:= k3 →
+                           E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ k1 ++ k2 ++ k3
+      ELimit           : ∀{E e r} → E ⊢ e ⌊ ⛽⟨ 0 ⟩ ⌋⇒ r ⊣ []
+
+  -- Constraints collection - the ordinary variety with no beta reduction counting or limit
+  Constraints⦃_,_⦄:=_ : result → result → constraints → Set
+  Constraints⦃ r1 , r2 ⦄:= k = Constraints⦃ r1 , r2 ⦄⌊ ∞ ⌋:= k
+
+  -- Backpropagation - the ordinary variety with no beta reduction counting or limit
+  _⇐_:=_ : result → ex → constraints → Set
+  r ⇐ ex := k = r ⇐ ex ⌊ ∞ ⌋:= k
 
   -- Big step evaluation - the ordinary variety with no beta reduction counting or limit
   _⊢_⇒_⊣_ : env → exp → result → constraints → Set
   E ⊢ e ⇒ r ⊣ k = E ⊢ e ⌊ ∞ ⌋⇒ r ⊣ k
 
-  -- Generic constraint failure - this goes through if evaluation would fail due to unsatisfiable constraints,
-  -- and it may go through if evaluation diverges. But it cannot be true if evaluation converges and all constraints are valid.
-  data _⊢_⌊_⌋⇒∅ : env → exp → Fuel → Set where
-    EFPair1      : ∀{E ⛽ e1 e2} →
-                     E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒∅
-    EFPair2      : ∀{E ⛽ e1 e2} →
-                     E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒∅
-    EFCtor       : ∀{E ⛽ c e} →
-                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒∅
-    EFAppFun     : ∀{E ⛽ e1 e2} →
-                     E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
-    EFAppArg     : ∀{E ⛽ e1 e2} →
-                     E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
-    EFAppEval    : ∀{E ⛽ ⛽↓ e1 Ef x ef k1 e2 r2 k2} →
-                     ⛽ ⛽⇓ ⛽↓ →
-                     E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ k1 →
-                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                     (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
-                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
-    EFAppFixEval : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2} →
-                     ⛽ ⛽⇓ ⛽↓ →
-                     r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                     E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                     (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
-                     E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
-    EFFst        : ∀{E ⛽ e} →
-                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ fst e ⌊ ⛽ ⌋⇒∅
-    EFSnd        : ∀{E ⛽ e} →
-                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ snd e ⌊ ⛽ ⌋⇒∅
-    EFMatchScrut : ∀{E ⛽ e rules} →
-                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
-    EFMatchRule  : ∀{E ⛽ ⛽↓ e rules c xc ec r' k'} →
-                     ⛽ ⛽⇓ ⛽↓ →
-                     (c , |C xc => ec) ∈ rules →
-                     E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
-                     (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒∅ →
-                     E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
-    EFAsrtL      : ∀{E ⛽ e1 e2} →
-                     E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
-    EFAsrtR      : ∀{E ⛽ e1 e2} →
-                     E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
-    EFAsrt       : ∀{E ⛽ e1 r1 k1 e2 r2 k2} →
-                     E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                     Constraints⦃ r1 , r2 ⦄:=∅ →
-                     E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
+  mutual
+    -- Constraint collection failure - see the comment for "Generic evaluation failure"
+    data Constraints⦃_,_⦄⌊_⌋:=∅ : result → result → Fuel → Set where
+      XCFPair1    : ∀{⛽ r1 r2 r'1 r'2} →
+                      Constraints⦃ r1 , r'1 ⦄⌊ ⛽ ⌋:=∅ →
+                      Constraints⦃ ⟨ r1 , r2 ⟩ , ⟨ r'1 , r'2 ⟩ ⦄⌊ ⛽ ⌋:=∅
+      XCFPair2    : ∀{⛽ r1 r2 r'1 r'2} →
+                      Constraints⦃ r2 , r'2 ⦄⌊ ⛽ ⌋:=∅ →
+                      Constraints⦃ ⟨ r1 , r2 ⟩ , ⟨ r'1 , r'2 ⟩ ⦄⌊ ⛽ ⌋:=∅
+      XCFCtorMM   : ∀{⛽ c c' r r'} →
+                      c ≠ c' →
+                      Constraints⦃ C[ c ] r , C[ c' ] r' ⦄⌊ ⛽ ⌋:=∅
+      XCFCtor     : ∀{⛽ c r r'} →
+                      Constraints⦃ r , r' ⦄⌊ ⛽ ⌋:=∅ →
+                      Constraints⦃ C[ c ] r , C[ c ] r' ⦄⌊ ⛽ ⌋:=∅
+      XCFXB1      : ∀{⛽ r r' ex} →
+                      r ≠ r' →
+                      not-both-pair r r' →
+                      not-both-ctor r r' →
+                      Coerce r' := ex →
+                      r ⇐ ex ⌊ ⛽ ⌋:=∅ →
+                      Constraints⦃ r , r' ⦄⌊ ⛽ ⌋:=∅
+      XCFXB2      : ∀{⛽ r r' ex} →
+                      r ≠ r' →
+                      not-both-pair r r' →
+                      not-both-ctor r r' →
+                      Coerce r := ex →
+                      r' ⇐ ex ⌊ ⛽ ⌋:=∅ →
+                      Constraints⦃ r , r' ⦄⌊ ⛽ ⌋:=∅
+      XCFNoCoerce : ∀{⛽ r r'} →
+                      r ≠ r' →
+                      not-both-pair r r' →
+                      not-both-ctor r r' →
+                      (∀{ex} → Coerce r  := ex → ⊥) →
+                      (∀{ex} → Coerce r' := ex → ⊥) →
+                      Constraints⦃ r , r' ⦄⌊ ⛽ ⌋:=∅
 
-  -- Constraint failure - the ordinary version with no beta reduction counting or limit
+    -- backpropagation failure - see the comment for "Generic evaluation failure"
+    -- TODO for this and xc failure, we should describe all the failure cases that we've gone to the effort
+    --      to positively characterize
+    data _⇐_⌊_⌋:=∅ : result → ex → Fuel → Set where
+      XBFHole       : ∀{⛽ E u v ex} → [ E ]??[ u ] ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅
+      XBFPair1      : ∀{⛽ r1 r2 ex1 ex2} →
+                        r1 ⇐ ex1 ⌊ ⛽ ⌋:=∅ →
+                        ⟨ r1 , r2 ⟩ ⇐ ⟨ ex1 , ex2 ⟩ ⌊ ⛽ ⌋:=∅
+      XBFPair2      : ∀{⛽ r1 r2 ex1 ex2} →
+                        r2 ⇐ ex2 ⌊ ⛽ ⌋:=∅ →
+                        ⟨ r1 , r2 ⟩ ⇐ ⟨ ex1 , ex2 ⟩ ⌊ ⛽ ⌋:=∅
+      XBFCtorMM     : ∀{⛽ c c' r ex} →
+                        c ≠ c' →
+                        (C[ c ] r) ⇐ C[ c' ] ex ⌊ ⛽ ⌋:=∅
+      XBFCtor       : ∀{⛽ c r ex} →
+                        r ⇐ ex ⌊ ⛽ ⌋:=∅ →
+                        (C[ c ] r) ⇐ C[ c ] ex ⌊ ⛽ ⌋:=∅
+      XBFAppNonVal  : ∀{⛽ r1 r2 ex} →
+                        ex ≠ ¿¿ →
+                        (r2 value → ⊥) →
+                        (r1 ∘ r2) ⇐ ex ⌊ ⛽ ⌋:=∅
+      XBFApp        : ∀{⛽ r v ex} →
+                        ex ≠ ¿¿ →
+                        v value →
+                        r ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅ →
+                        (r ∘ v) ⇐ ex ⌊ ⛽ ⌋:=∅
+      XBFFunEval    : ∀{⛽ ⛽↓ E x e v ex} →
+                        ⛽ ⛽⇓ ⛽↓ →
+                        (E ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒∅ →
+                        ([ E ]λ x => e) ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅
+      XBFFun        : ∀{⛽ ⛽↓ E x e v ex r k} →
+                        ⛽ ⛽⇓ ⛽↓ →
+                        (E ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒ r ⊣ k →
+                        r ⇐ ex ⌊ ⛽↓ ⌋:=∅ →
+                        ([ E ]λ x => e) ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅
+      XBFFixEval    : ∀{⛽ ⛽↓ E f x e rf v ex} →
+                        ⛽ ⛽⇓ ⛽↓ →
+                        rf == [ E ]fix f ⦇·λ x => e ·⦈ →
+                        (E ,, (f , rf) ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒∅ →
+                        rf ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅
+      XBFFix        : ∀{⛽ ⛽↓ E f x e rf v ex r k} →
+                        ⛽ ⛽⇓ ⛽↓ →
+                        rf == [ E ]fix f ⦇·λ x => e ·⦈ →
+                        (E ,, (f , rf) ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒ r ⊣ k →
+                        r ⇐ ex ⌊ ⛽↓ ⌋:=∅ →
+                        rf ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅
+      XBFFst        : ∀{⛽ r ex1} →
+                        ex1 ≠ ¿¿ →
+                        r ⇐ ⟨ ex1 , ¿¿ ⟩ ⌊ ⛽ ⌋:=∅ →
+                        fst r ⇐ ex1 ⌊ ⛽ ⌋:=∅
+      XBFSnd        : ∀{⛽ r ex2} →
+                        ex2 ≠ ¿¿ →
+                        r ⇐ ⟨ ¿¿ , ex2 ⟩ ⌊ ⛽ ⌋:=∅ →
+                        snd r ⇐ ex2 ⌊ ⛽ ⌋:=∅
+      XBFMatch      : ∀{⛽ ⛽↓ E r rules ex} →
+                        ⛽ ⛽⇓ ⛽↓ →
+                        ex ≠ ¿¿ →
+                        -- for every constructor, one of three failures must occur
+                        (∀{c-j x-j e-j} →
+                           (c-j , |C x-j => e-j) ∈ rules →
+                             -- fails to backpropagate the constructor to the scrutinee
+                             r ⇐ C[ c-j ] ¿¿ ⌊ ⛽ ⌋:=∅
+                                  {- OR -} ∨ Σ[ k1 ∈ constraints ] (
+                             -- fails evaluation (2nd line)
+                             r ⇐ C[ c-j ] ¿¿ ⌊ ⛽ ⌋:= k1 ∧
+                             (E ,, (x-j , C⁻[ c-j ] r)) ⊢ e-j ⌊ ⛽↓ ⌋⇒∅)
+                                  {- OR -} ∨ Σ[ k1 ∈ constraints ] Σ[ k2 ∈ constraints ] Σ[ r-j ∈ result ] (
+                             -- the (successfully) eval'd result fails backpropagation (3rd line)
+                             r ⇐ C[ c-j ] ¿¿ ⌊ ⛽ ⌋:= k1 ∧
+                             (E ,, (x-j , C⁻[ c-j ] r)) ⊢ e-j ⌊ ⛽↓ ⌋⇒ r-j ⊣ k2 ∧
+                             r-j ⇐ ex ⌊ ⛽↓ ⌋:=∅)) →
+                        [ E ]case r of⦃· rules ·⦄ ⇐ ex ⌊ ⛽ ⌋:=∅
+      XBFUnwrapCtor : ∀{⛽ c r ex} →
+                        ex ≠ ¿¿ →
+                        r ⇐ C[ c ] ex ⌊ ⛽ ⌋:=∅ →
+                        (C⁻[ c ] r) ⇐ ex ⌊ ⛽ ⌋:=∅
+
+    -- Generic evaluation failure - this goes through if evaluation would fail due to unsatisfiablility
+    -- of a some constraint collection or backpropagation attempt that occurs during evaluation,
+    -- and it may go through if evaluation diverges.
+    -- But this judgment cannot be satisfied if evaluation converges and all constraints are valid.
+    data _⊢_⌊_⌋⇒∅ : env → exp → Fuel → Set where
+      EFPair1      : ∀{E ⛽ e1 e2} →
+                       E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒∅
+      EFPair2      : ∀{E ⛽ e1 e2} →
+                       E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒∅
+      EFCtor       : ∀{E ⛽ c e} →
+                       E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒∅
+      EFAppFun     : ∀{E ⛽ e1 e2} →
+                       E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+      EFAppArg     : ∀{E ⛽ e1 e2} →
+                       E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+      EFAppEval    : ∀{E ⛽ ⛽↓ e1 Ef x ef k1 e2 r2 k2} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ k1 →
+                       E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                       (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
+                       E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+      EFAppFixEval : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                       E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                       E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                       (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
+                       E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
+      EFFst        : ∀{E ⛽ e} →
+                       E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ fst e ⌊ ⛽ ⌋⇒∅
+      EFSnd        : ∀{E ⛽ e} →
+                       E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ snd e ⌊ ⛽ ⌋⇒∅
+      EFMatchScrut : ∀{E ⛽ e rules} →
+                       E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
+      EFMatchRule  : ∀{E ⛽ ⛽↓ e rules c xc ec r' k'} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       (c , |C xc => ec) ∈ rules →
+                       E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
+                       (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒∅ →
+                       E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
+      EFAsrtL      : ∀{E ⛽ e1 e2} →
+                       E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
+      EFAsrtR      : ∀{E ⛽ e1 e2} →
+                       E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
+                       E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
+      EFAsrt       : ∀{E ⛽ e1 r1 k1 e2 r2 k2} →
+                       E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
+                       E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                       Constraints⦃ r1 , r2 ⦄⌊ ⛽ ⌋:=∅ →
+                       E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
+
+  -- Evaluation failure - the ordinary version with no beta reduction counting or limit
   _⊢_⇒∅ : env → exp → Set
   E ⊢ e ⇒∅ = E ⊢ e ⌊ ∞ ⌋⇒∅
 

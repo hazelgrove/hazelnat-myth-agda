@@ -363,6 +363,7 @@ module core where
     -- generally, all the steps from an exp to an something with holes should not contain hole names
     -- not in the original exp, and the process as a whole should also not produce spurious names
     -- this realization probably means there are other important theorems that have been missed
+    -- NOTE the core theorem in completeness.agda will do the trick for evaluation itself
 
     -- TODO we should have theorems that constrain where don't cares and such can be found.
     -- Don't cares should only be generated in backprop and should not appear anywhere else.

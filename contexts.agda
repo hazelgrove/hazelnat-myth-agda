@@ -7,7 +7,8 @@ module contexts where
   diff-1 : ∀{n m} → n < m → Nat
   diff-1 n<m = difference (n<m→1+n≤m n<m)
 
-  ---- the core definitions ----
+  ---- the core declarations ----
+  -- TODO move definitions
 
   _ctx : Set → Set
   A ctx = List (Nat ∧ A)
@@ -48,9 +49,20 @@ module contexts where
   _#_ : {A : Set} (n : Nat) → (Γ : A ctx) → Set
   x # Γ = dom Γ x → ⊥
 
-  -- TODO theorems
+  -- TODO theorems and explanation
   ctxmap : {A B : Set} → (A → B) → A ctx → B ctx
   ctxmap f Γ = map (λ {(hx , ha) → (hx , f ha)}) Γ
+
+  -- TODO theorems
+  -- returns a list of the values stored in the context
+  ctx⇒values : {A : Set} → A ctx → List A
+
+  -- TODO theorems and explanation
+  list⇒ctx : {A : Set} → List (Nat ∧ A) → (List A) ctx
+
+  -- TODO theorems
+  -- a ∪ b is the union of a and b, with mappings in b overriding those in a
+  _∪_ : {A : Set} → A ctx → A ctx → A ctx
 
   -- The primary way to test membership is to use _∈_,
   -- but this can be used in cases where using _∈_
@@ -429,11 +441,9 @@ module contexts where
         ... | x#Γ++1 | x#Γ++2
           rewrite lookup-cp-1 x#Γ++1 | lookup-cp-1 x#Γ++2 = refl
 
-  ---- one more definition (relies on ctxindirect) ----
+  ---- remaining function definitions ----
 
-  -- TODO theorems
-  -- TODO move back to normal place after updating to agda 6
-  list⇒ctx : {A : Set} → List (Nat ∧ A) → (List A) ctx
+  -- TODO redefine using foldl
   list⇒ctx [] = ∅
   list⇒ctx ((n , a) :: l)
     with list⇒ctx l
@@ -444,13 +454,12 @@ module contexts where
   ... | Inr n#rest-ctx
           = l-ctx ,, (n , a :: [])
 
+  ctx⇒values = map π2
+
   -- TODO maybe define ctx⇒list then refactor this
   union' : {A : Set} → A ctx → A ctx → Nat → A ctx
   union' Γ1 [] _ = Γ1
   union' Γ1 ((hx , ha) :: Γ2) offset
     = union' (Γ1 ,, (hx + offset , ha)) Γ2 (offset + 1+ hx)
 
-  -- TODO theorems
-  -- a ∪ b is the union of a and b, with mappings in b overriding those in a
-  _∪_ : {A : Set} → A ctx → A ctx → A ctx
   Γ1 ∪ Γ2 = union' Γ1 Γ2 0

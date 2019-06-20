@@ -678,121 +678,141 @@ module core where
   _⊢_⇒∅ : env → exp → Set
   E ⊢ e ⇒∅ = E ⊢ e ⌊ ∞ ⌋⇒∅
 
-  -- TODO we'll need some theorems for group
+  -- TODO we'll need some theorems for Group and Filter
   -- TODO also theorems for everything below, including synthesis and solve
-  group : constraints → worlds ctx
-  group = list⇒ctx
+  Group : constraints → worlds ctx
+  Group = list⇒ctx
+
+  -- TODO change :=> back to := after we come up with a new symbol for constraints
+  data Filter_:=>_ : worlds → worlds → Set where
+    FilterNil : Filter [] :=> []
+    FilterYes : ∀{W W' E ex} →
+                  Filter W :=> W' →
+                  ex ≠ ¿¿ →
+                  Filter (E , ex) :: W :=> ((E , ex) :: W')
+    FilterNo  : ∀{W W' E} →
+                  Filter W :=> W' →
+                  Filter (E , ¿¿) :: W :=> W'
 
   -- synthesis
 
-  -- TODO this will be replaced by backpropagation
-  data _·⊨_ : ex → result → Set where
-    SCtor : ∀{ex v c} →
-              ex ·⊨ v →
-              (C[ c ] ex) ·⊨ (C[ c ] v)
-    SUnit : ⟨⟩ ·⊨ ⟨⟩
-    SPair : ∀{ex1 ex2 v1 v2} →
-              ex1 ·⊨ v1 →
-              ex2 ·⊨ v2 →
-              ⟨ ex1 , ex2 ⟩ ·⊨ ⟨ v1 , v2 ⟩
+  -- TODO theorem that synthesized expressions evaluate completely with no constraints
+  -- TODO theorem that if u # Δ , then u is new in a type-checked exp or result
 
-  data _⊨_ : worlds → exp → Set where
-    SEmpty : ∀{e} → [] ⊨ e
-    SWorld : ∀{W E k ex v e} →
-               W ⊨ e →
-               E ⊢ e ⇒ v ⊣ k →
-               ex ·⊨ v →
-               ((E , ex) :: W) ⊨ e
+  data _⊨_:=_ : worlds → exp → constraints → Set where
+    SEmpty : ∀{e} → [] ⊨ e := []
+    SWorld : ∀{W E ex e r k1 k2} →
+               W ⊨ e := k1 →
+               E ⊢ e ⇒ r ⊣ [] →
+               r ⇐ ex := k2 →
+               ((E , ex) :: W) ⊨ e := k1 ++ k2
 
   mutual
     -- synthesis by refinement
-    data _,_,_⊢_↑_ : denv → tctx → worlds → typ → exp → Set where
-      IRCtor : ∀{Σ' Γ W W' d cctx c τ e} →
+    data _,_,_,_⊢_⇝_:=_ : hctx → denv → tctx → worlds → typ → exp → constraints → Set where
+      IRCtor : ∀{Δ Σ' Γ W W' d cctx c τ e k} →
                  (d , cctx) ∈ π1 Σ' →
                  (c , τ) ∈ cctx →
-                 W == map (λ {(E , ex) → (E , C[ c ] ex)}) W' →
-                 Σ' , Γ , W' ⊢ τ ↑ e →
-                 Σ' , Γ , W ⊢ D[ d ] ↑ (C[ c ] e)
-      IRUnit : ∀{Σ' Γ W} → Σ' , Γ , W ⊢ ⟨⟩ ↑ ⟨⟩
-      IRPair : ∀{Σ' Γ W Es ex1s ex2s τ1 τ2 e1 e2} →
+                 Filter W :=> map (λ {(E , ex) → E , C[ c ] ex}) W' →
+                 Δ , Σ' , Γ , W' ⊢ τ ⇝ e := k →
+                 Δ , Σ' , Γ , W ⊢ D[ d ] ⇝ C[ c ] e := k
+      IRUnit : ∀{Δ Σ' Γ W} → Δ , Σ' , Γ , W ⊢ ⟨⟩ ⇝ ⟨⟩ := []
+      IRPair : ∀{Δ Σ' Γ W Es ex1s ex2s τ1 τ2 e1 e2 k1 k2} →
                  ∥ Es ∥ == ∥ ex1s ∥ →
                  ∥ Es ∥ == ∥ ex2s ∥ →
-                 W == zip Es (map (λ {( ex1 , ex2 ) → ⟨ ex1 , ex2 ⟩}) (zip ex1s ex2s)) →
-                 Σ' , Γ , (zip Es ex1s) ⊢ τ1 ↑ e1 →
-                 Σ' , Γ , (zip Es ex2s) ⊢ τ2 ↑ e2 →
-                 Σ' , Γ , W ⊢ ⟨ τ1 × τ2 ⟩ ↑ ⟨ e1 , e2 ⟩
-      IRMatch : ∀{Σ' Γ W W' W'' τ e rules d cctx x} →
+                 Filter W :=> zip Es (map (λ {( ex1 , ex2 ) → ⟨ ex1 , ex2 ⟩}) (zip ex1s ex2s)) →
+                 Δ , Σ' , Γ , (zip Es ex1s) ⊢ τ1 ⇝ e1 := k1 →
+                 Δ , Σ' , Γ , (zip Es ex2s) ⊢ τ2 ⇝ e2 := k2 →
+                 Δ , Σ' , Γ , W ⊢ ⟨ τ1 × τ2 ⟩ ⇝ ⟨ e1 , e2 ⟩ := k1 ++ k2
+      IRMatch : ∀{Δ Σ' Γ W Wf Wf-evald Wf-ctx τ e rules d cctx x k-ctx} →
+                  (∀{c} → dom k-ctx c → dom rules c) →
+                  (∀{c} → dom rules c → dom k-ctx c) →
                   -- choose a datatype
                   (d , cctx) ∈ π1 Σ' →
+                  (∀{c} → dom cctx c → dom rules c) →
+                  (∀{c} → dom rules c → dom cctx c) →
                   -- choose one fresh variable name that will be used for all cases
                   x # Γ →
+                  (∀{c rule} → (c , rule) ∈ rules → rule.parm rule == x) →
                   -- synthesize a scrutinee
-                  Σ' , Γ ⊢ D[ d ] ↥ e →
-                  (∀{c rule} →
-                     (c , rule) ∈ rules →
-                     dom cctx c ∧ rule.parm rule == x) →
-                  ∥ W' ∥ == ∥ W ∥ →
-                  -- W' contains the same worlds as W, but each one is packaged with
-                  -- the constructor name and value that the scrutinee would evaluate
+                  Δ , Σ' , Γ ⊢ D[ d ] ⇝ e →
+                  -- For each world of Filter W, the corresponding element in Wf-evald is a pair
+                  -- of the constructor name and result that the scrutinee would evaluate
                   -- to in that world.
-                  (∀{i E ex} →
-                     W ⟦ i ⟧ == Some (E , ex) →
-                     Σ[ c ∈ Nat ] Σ[ v ∈ result ] (
-                       dom cctx c ∧
-                       -- TODO reconsider the value-ness of this
-                       v value ∧
-                       W' ⟦ i ⟧ == Some (c , E , ex , v) ∧
-                       E ⊢ e ⇒ C[ c ] v ⊣ [])) →
-                  -- For each c in the domain of cctx, W'' maps to a list of extended worlds,
+                  Filter W :=> Wf →
+                  ∥ Wf ∥ == ∥ Wf-evald ∥ →
+                  (∀{i E-i ex-i c-i r-i} →
+                     Wf       ⟦ i ⟧ == Some (E-i , ex-i) →
+                     Wf-evald ⟦ i ⟧ == Some (c-i , r-i) →
+                     E-i ⊢ e ⇒ C[ c-i ] r-i ⊣ []) →
+                  -- For each c in the domain of cctx, Wf-ctx maps to a list of extended worlds,
                   -- where each extended world has the specified example, but an env where the
                   -- branch variable x is assosiated with the value that the scrutinee evaluates
                   -- to under the original env.
-                  W'' ==
+                  Wf-ctx ==
                     (ctxmap (λ _ → []) cctx)
                       ∪
-                    ctxmap (map λ {(E , ex , v) → (E ,, (x , v)) , ex}) (list⇒ctx W') →
+                    (list⇒ctx (map (λ {((E , ex) , c , r) → c , (E ,, (x , r)) , ex}) (zip Wf Wf-evald))) →
                   -- Each rule's branch expression must synthesize under the aforementioned
                   -- extended worlds.
-                  (∀{c τc} →
+                  (∀{c ec τc Wc kc} →
+                     (c , |C x => ec) ∈ rules →
                      (c , τc) ∈ cctx →
-                     Σ[ ec ∈ exp ] Σ[ Wc ∈ worlds ] (
-                        (c , Wc) ∈ W'' ∧
-                        (c , |C x => ec) ∈ rules ∧
-                        Σ' , (Γ ,, (x , τc)) , Wc ⊢ τ ↑ ec)) →
-                  Σ' , Γ , W ⊢ τ ↑ case e of⦃· rules ·⦄
-      IRGuess : ∀{Σ' Γ W τ e} →
-                  Σ' , Γ ⊢ τ ↥ e →
-                  W ⊨ e →
-                  Σ' , Γ , W ⊢ τ ↑ e
+                     (c , Wc) ∈ Wf-ctx →
+                     (c , kc) ∈ k-ctx →
+                     Δ , Σ' , (Γ ,, (x , τc)) , Wc ⊢ τ ⇝ ec := kc) →
+                  Δ , Σ' , Γ , W ⊢ τ ⇝ case e of⦃· rules ·⦄ := foldl _++_ [] (ctx⇒values k-ctx)
+      IRGuess : ∀{Δ Σ' Γ W τ e k} →
+                  Δ , Σ' , Γ ⊢ τ ⇝ e →
+                  W ⊨ e := k →
+                  Δ , Σ' , Γ , W ⊢ τ ⇝ e := k
+      IRHole  : ∀{Δ Σ' Γ W τ u} →
+                  W ≠ [] →
+                  (Filter W :=> [] → ⊥) →
+                  u # Δ →
+                  Δ , Σ' , Γ , W ⊢ τ ⇝ ??[ u ] := []
 
     -- synthesis by guess
-    data _,_⊢_↥_ : denv → tctx → typ → exp → Set where
-      EGVar : ∀{Σ' Γ τ x} →
+    data _,_,_⊢_⇝_ : hctx → denv → tctx → typ → exp → Set where
+      EGVar : ∀{Δ Σ' Γ τ x} →
                 (x , τ) ∈ Γ →
-                Σ' , Γ ⊢ τ ↥ X[ x ]
-      EGApp : ∀{Σ' Γ τ1 τ2 e1 e2} →
-                Σ' , Γ ⊢ τ1 ==> τ2 ↥ e1 →
-                Σ' , Γ , [] ⊢ τ1 ↑ e2 →
-                Σ' , Γ ⊢ τ2 ↥ (e1 ∘ e2)
-      EGFst : ∀{Σ' Γ τ1 τ2 e} →
-                Σ' , Γ ⊢ ⟨ τ1 × τ2 ⟩ ↥ e →
-                Σ' , Γ ⊢ τ1 ↥ (fst e)
-      EGSnd : ∀{Σ' Γ τ1 τ2 e} →
-                Σ' , Γ ⊢ ⟨ τ1 × τ2 ⟩ ↥ e →
-                Σ' , Γ ⊢ τ2 ↥ (snd e)
+                Δ , Σ' , Γ ⊢ τ ⇝ X[ x ]
+      EGApp : ∀{Δ Σ' Γ τ1 τ2 e1 e2} →
+                Δ , Σ' , Γ ⊢ τ1 ==> τ2 ⇝ e1 →
+                Δ , Σ' , Γ , [] ⊢ τ1 ⇝ e2 := [] →
+                Δ , Σ' , Γ ⊢ τ2 ⇝ (e1 ∘ e2)
+      EGFst : ∀{Δ Σ' Γ τ1 τ2 e} →
+                Δ , Σ' , Γ ⊢ ⟨ τ1 × τ2 ⟩ ⇝ e →
+                Δ , Σ' , Γ ⊢ τ1 ⇝ (fst e)
+      EGSnd : ∀{Δ Σ' Γ τ1 τ2 e} →
+                Δ , Σ' , Γ ⊢ ⟨ τ1 × τ2 ⟩ ⇝ e →
+                Δ , Σ' , Γ ⊢ τ2 ⇝ (snd e)
 
-  data _,_⊢Solve_:=_ : hctx → denv → constraints → exp ctx → Set where
-    Sol : ∀{Δ Σ' k g s} →
-            g == group k →
+  data _,_⊢IterSolve_:=_ : hctx → denv → constraints → exp ctx → Set where
+    Fix : ∀{Δ Σ' k g h} →
+            g == Group k →
             (∀{u} → dom g u → dom Δ u) →
-            (∀{u} → dom g u → dom s u) →
-            (∀{u} → dom s u → dom g u) →
-            (∀{u Wu Γu τu su} →
+            (∀{u} → dom g u → dom h u) →
+            (∀{u} → dom h u → dom g u) →
+            (∀{u Wu Γu τu eu} →
                (u , Wu) ∈ g →
                (u , Γu , τu) ∈ Δ →
-               (u , su) ∈ s →
-               Σ' , Γu , Wu ⊢ τu ↑ su) →
-            Δ , Σ' ⊢Solve k := s
+               (u , eu) ∈ h →
+               Δ , Σ' , Γu , Wu ⊢ τu ⇝ eu := []) →
+            Δ , Σ' ⊢IterSolve k := h
+    Rec : ∀{Δ Σ' k g ek-ctx k' h} →
+            g == Group k →
+            (∀{u} → dom g u → dom Δ u) →
+            (∀{u} → dom g u → dom ek-ctx u) →
+            (∀{u} → dom ek-ctx u → dom g u) →
+            (∀{u Wu Γu τu eu ku} →
+               (u , Wu) ∈ g →
+               (u , Γu , τu) ∈ Δ →
+               (u , eu , ku) ∈ ek-ctx →
+               Δ , Σ' , Γu , Wu ⊢ τu ⇝ eu := ku) →
+            k' == foldl _++_ k (map π2 (ctx⇒values ek-ctx)) →
+            Δ , Σ' ⊢IterSolve k' := h →
+            Δ , Σ' ⊢IterSolve k := h
 
 {- TODO
 

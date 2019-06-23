@@ -317,7 +317,7 @@ module contexts where
   ... | Inl refl | Inr ne   | _        = Inr λ where refl → ne refl
   ... | Inr ne   | _        | _        = Inr λ where refl → ne refl
 
-  -- A useful way to destruct contexts. Never destruct a context via _::_
+  -- A useful way to destruct context membership. Never destruct a context via _::_
   ctx-split : {A : Set} {Γ : A ctx} {n m : Nat} {an am : A} →
                 (n , an) ∈ (Γ ,, (m , am)) →
                 (n ≠ m ∧ (n , an) ∈ Γ) ∨ (n == m ∧ an == am)
@@ -325,6 +325,52 @@ module contexts where
     with natEQ n m
   ... | Inl refl = Inr (refl , ctxunicity n∈Γ+ (x,a∈Γ,,x,a {Γ = Γ}))
   ... | Inr n≠m  = Inl (n≠m , x∈Γ+→x∈Γ n≠m n∈Γ+)
+
+  -- I'd say "God dammit agda" but AFAICT Coq is terrible about this as well
+  lemma-bullshit : {A : Set} (Γ' : A ctx) (a : A) (n m : Nat) →
+                    Σ[ Γ ∈ A ctx ] (Γ == (n + 1+ m , a) :: Γ')
+  lemma-bullshit Γ' a n m = ((n + 1+ m , a) :: Γ') , refl
+
+  -- Allows the elimination of contexts. Never destruct a context via _::_
+  ctx-elim : {A : Set} {Γ : A ctx} →
+              Γ == ∅
+                ∨
+              Σ[ n ∈ Nat ] Σ[ a ∈ A ] Σ[ Γ' ∈ A ctx ]
+                 (Γ == Γ' ,, (n , a) ∧ n # Γ')
+  ctx-elim {Γ = []}            = Inl refl
+  ctx-elim {Γ = (n , a) :: []} = Inr (_ , _ , _ , refl , x#∅)
+  ctx-elim {Γ = (n , a) :: ((m , a2) :: Γ'')}
+    with lemma-bullshit Γ'' a2 m n
+  ... | Γ' , eq
+    = Inr (n , a , Γ' , eqP , not-dom)
+      where
+        eqP : (n , a) :: ((m , a2) :: Γ'') == Γ' ,, (n , a)
+        eqP rewrite eq with <dec n (m + 1+ n)
+        ... | Inl n<m+1+n
+          rewrite ! (undiff-1 n m n<m+1+n) = refl
+        ... | Inr (Inl n==m+1+n)
+          = abort (n≠n+1+m (n==m+1+n · (n+1+m==1+n+m · +comm {1+ m})))
+        ... | Inr (Inr m+1+n<n)
+          = abort (<antisym m+1+n<n (n<m→n<s+m n<1+n))
+        not-dom : dom Γ' n → ⊥
+        not-dom rewrite eq = λ n∈Γ' →
+          too-small (n<m→n<s+m n<1+n) n∈Γ'
+
+  -- When using ctx-elim, this theorem is useful for establishing termination
+  ctx-decreasing : {A : Set} {Γ : A ctx} {n : Nat} {a : A} →
+                    n # Γ →
+                    ∥ Γ ,, (n , a) ∥ == 1+ ∥ Γ ∥
+  ctx-decreasing {Γ = []} n#Γ = refl
+  ctx-decreasing {Γ = (n' , a') :: Γ} {n} n#Γ
+    with <dec n n'
+  ... | Inl n<n'       = refl
+  ... | Inr (Inl refl) = abort (n#Γ (_ , InH))
+  ... | Inr (Inr n'<n)
+    = 1+ap (ctx-decreasing λ {(a , diff∈Γ) →
+        n#Γ (a , tr
+                   (λ y → (y , a) ∈ ((n' , a') :: Γ))
+                   (m-n+n==m (n<m→1+n≤m n'<n))
+                   (InT diff∈Γ))})
 
   ---- contrapositives of some previous theorems ----
 

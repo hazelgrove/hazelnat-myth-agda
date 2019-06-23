@@ -56,6 +56,9 @@ module Nat where
   natEQ (1+ x) (1+ .x) | Inl refl = Inl refl
   ... | Inr b = Inr (λ x₁ → b (1+inj x₁))
 
+  0≠1+n : ∀{n} → 0 ≠ 1+ n
+  0≠1+n = λ ()
+
   -- _+_ theorems
 
   n+Z==n : ∀{n} → n + Z == n

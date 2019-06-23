@@ -6,66 +6,36 @@ open import contexts
 open import core
 
 module results-checks where
-  -- all values are complete and final
+  -- all values are final
   mutual
-    values-complete : ∀{r} → r value → r rcomplete
-    values-complete (VLam E-vals e-complete) = RCLam (env-values-complete E-vals) e-complete
-    values-complete (VFix E-vals e-complete) = RCFix (env-values-complete E-vals) e-complete
-    values-complete (VTpl h) = RCTpl λ i<∥rs∥ → values-complete (h i<∥rs∥)
-    values-complete (VCon val) = RCCtor (values-complete val)
-    values-complete (VPF h) = RCPF (pf-value-complete h)
-
     values-final : ∀{r} → r value → r final
-    values-final (VLam h _) = FLam (env-values-final h)
-    values-final (VFix h _) = FFix (env-values-final h)
-    values-final (VTpl h) = FTpl λ i<∥rs∥ → values-final (h i<∥rs∥)
+    values-final (VLam x) = FLam x
+    values-final (VFix x) = FFix x
+    values-final VUnit = FUnit
+    values-final (VPair val val₁) = FPair (values-final val) (values-final val₁)
     values-final (VCon val) = FCon (values-final val)
-    values-final (VPF h) = FPF (pf-value-final h)
 
-    env-values-complete : ∀{E} → E env-values → E env-complete
-    env-values-complete (EF E-vals) = ENVC λ rx∈E → values-complete (E-vals rx∈E)
+    Coerce-preservation : ∀{Δ Σ' r ex τ} →
+                            Δ , Σ' ⊢ r ·: τ →
+                            Coerce r := ex →
+                            Δ , Σ' ⊢ ex :· τ
+    Coerce-preservation (TALam x x₁) ()
+    Coerce-preservation (TAFix x x₁) ()
+    Coerce-preservation (TAApp ta-r ta-r₁) ()
+    Coerce-preservation TAUnit CoerceUnit = TAUnit
+    Coerce-preservation (TAPair ta-r1 ta-r2) (CoercePair c-r1 c-r2)
+      = TAPair (Coerce-preservation ta-r1 c-r1) (Coerce-preservation ta-r2 c-r2)
+    Coerce-preservation (TAFst ta-r) ()
+    Coerce-preservation (TASnd ta-r) ()
+    Coerce-preservation (TACtor h1 h2 ta-r) (CoerceCtor c-r)
+      = TACtor h1 h2 (Coerce-preservation ta-r c-r)
+    Coerce-preservation (TAUnwrapCtor x x₁ ta-r) ()
+    Coerce-preservation (TACase x x₁ ta-r x₂ x₃) ()
+    Coerce-preservation (TAHole x x₁) ()
 
-    env-values-final : ∀{E} → E env-values → E env-final
-    env-values-final (EF E-vals) = EF λ rx∈E → values-final (E-vals rx∈E)
-
-    pf-value-complete : ∀{pf} → pf pf-value → pf pf-complete
-    pf-value-complete (PFV pf-vals) =
-      PFC λ i<∥pf∥ → (
-            let (val-cmp , ex-cmp) = pf-vals i<∥pf∥ in
-            values-complete val-cmp , ex-values-complete ex-cmp)
-
-    pf-value-final : ∀{pf} → pf pf-value → pf pf-final
-    pf-value-final (PFV pf-vals) =
-      PFF λ i<∥pf∥ → (
-            let (val-fin , ex-fin) = pf-vals i<∥pf∥ in
-            values-final val-fin , ex-values-final ex-fin)
-
-    ex-values-complete : ∀{ex} → ex ex-value → ex ex-complete
-    ex-values-complete (EXVPF pf-val) = EXCPF (pf-value-complete pf-val)
-    ex-values-complete (EXVTpl h) = EXCTpl λ i<∥exs∥ → ex-values-complete (h i<∥exs∥)
-    ex-values-complete (EXVCtor ex-val) = EXCCtor (ex-values-complete ex-val)
-
-    ex-values-final : ∀{ex} → ex ex-value → ex ex-final
-    ex-values-final (EXVPF pf-val) = EXFPF (pf-value-final pf-val)
-    ex-values-final (EXVTpl h) = EXFTpl λ i<∥exs∥ → ex-values-final (h i<∥exs∥)
-    ex-values-final (EXVCtor ex-val) = EXFCtor (ex-values-final ex-val)
-
-    -- if an example type-checks, it's a value
-    ex-ta-value : ∀{Σ' ex τ} → Σ' ⊢ ex :· τ → ex ex-value
-    ex-ta-value (TATpl ∥exs∥==∥τs∥ h)
-      = EXVTpl (λ {i ex-i} exs[i]==ex-i →
-          let _ , τs[i]==τ-i = ∥l1∥==∥l2∥→l1[i]→l2[i] ∥exs∥==∥τs∥ exs[i]==ex-i in
-          ex-ta-value (h exs[i]==ex-i τs[i]==τ-i))
-    ex-ta-value (TACtor _ _ ta) = EXVCtor (ex-ta-value ta)
-    ex-ta-value {ex = PF pf} (TAPF h)
-      = EXVPF (PFV λ {i v-i ex-i} pf[i]==v,ex →
-          let (rval , rta , exta) = h pf[i]==v,ex in
-          rval , (ex-ta-value exta))
-
-  -- TODO what is this? Probably delete
-    -- pf-ta-value : ∀{Σ' pf τ} → Σ' ⊢ ex :· τ → ex ex-value
-
-  {- TODO : not currently true because pf ∘ blah is complete and final but not a value
+  {- TODO : We should revive this - it's a good sanity check.
+            Of course, we have to decide what version of "complete" we want to use
+            for results
   -- all complete finals (that type-check) are values
   mutual
     complete-finals-values : ∀{Δ Σ' r τ} →

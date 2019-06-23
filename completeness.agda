@@ -5,25 +5,19 @@ open import List
 open import contexts
 open import core
 
-open import preservation
-open import results-checks
-
 module completeness where
-  -- if an example type-checks, it's complete
-  ex-ta-complete : ∀{Σ' ex τ} → Σ' ⊢ ex :· τ → ex ex-complete
-  ex-ta-complete = ex-values-complete ⊙ ex-ta-value
-
   -- any hole is new to a complete expression
   e-complete-hnn : ∀{e u} → e ecomplete → hole-name-new e u
   e-complete-hnn (ECLam cmp) = HNNLam (e-complete-hnn cmp)
   e-complete-hnn (ECFix cmp) = HNNFix (e-complete-hnn cmp)
   e-complete-hnn ECVar = HNNVar
   e-complete-hnn (ECAp cmp1 cmp2) = HNNAp (e-complete-hnn cmp1) (e-complete-hnn cmp2)
-  e-complete-hnn (ECTpl h) = HNNTup λ i<∥es∥ → e-complete-hnn (h i<∥es∥)
-  e-complete-hnn (ECGet cmp) = HNNGet (e-complete-hnn cmp)
+  e-complete-hnn ECUnit = HNNUnit
+  e-complete-hnn (ECPair cmp cmp₁) = HNNPair (e-complete-hnn cmp) (e-complete-hnn cmp₁)
+  e-complete-hnn (ECFst cmp) = HNNFst (e-complete-hnn cmp)
+  e-complete-hnn (ECSnd cmp) = HNNSnd (e-complete-hnn cmp)
   e-complete-hnn (ECCtor cmp) = HNNCtor (e-complete-hnn cmp)
   e-complete-hnn (ECCase cmp h) = HNNCase (e-complete-hnn cmp) λ i<∥rules∥ → e-complete-hnn (h i<∥rules∥)
-  e-complete-hnn (ECPF cmp) = HNNPF cmp
   e-complete-hnn (ECAsrt cmp1 cmp2) = HNNAsrt (e-complete-hnn cmp1) (e-complete-hnn cmp2)
 
   {- TODO : probably delete
@@ -37,15 +31,19 @@ module completeness where
   e-complete-disjoint (ECFix cmp) = HDFix (e-complete-disjoint cmp)
   e-complete-disjoint ECVar = HDVar
   e-complete-disjoint (ECAp cmp1 cmp2) = HDAp (e-complete-disjoint cmp1) (e-complete-disjoint cmp2)
-  e-complete-disjoint (ECTpl h) = HDTup λ i<∥es∥ → e-complete-disjoint (h i<∥es∥)
-  e-complete-disjoint (ECGet cmp) = HDGet (e-complete-disjoint cmp)
+  e-complete-disjoint ECUnit = HDUnit
+  e-complete-disjoint (ECPair cmp cmp₁) = HDPair (e-complete-disjoint cmp) (e-complete-disjoint cmp₁)
+  e-complete-disjoint (ECFst cmp) = HDFst (e-complete-disjoint cmp)
+  e-complete-disjoint (ECSnd cmp) = HDSnd (e-complete-disjoint cmp)
   e-complete-disjoint (ECCtor cmp) = HDCtor (e-complete-disjoint cmp)
   e-complete-disjoint (ECCase cmp h) = HDCase (e-complete-disjoint cmp) λ i<∥rules∥ → e-complete-disjoint (h i<∥rules∥)
-  e-complete-disjoint (ECPF cmp) = HDPF cmp
   e-complete-disjoint (ECAsrt cmp1 cmp2) = HDAsrt (e-complete-disjoint cmp1) (e-complete-disjoint cmp2)
 
   -- TODO a holes-disjoint-sym check - very involved but arguably pretty important
 
+  -- TODO we should generalize this, to a theorem that says that if a hole name is new in
+  -- e, then it is new in r and k
+  {- TODO}
   -- if e evals to r, and e is complete, then r is complete
   eval-completeness : ∀{Δ Σ' Γ E e r τ k} →
                         E env-complete →
@@ -119,3 +117,4 @@ module completeness where
   eval-completeness Ecmp Γ⊢E (TAHole _) EHole ()
   eval-completeness Ecmp Γ⊢E (TAPF _) EPF (ECPF pf-cmp) = RCPF pf-cmp
   eval-completeness Ecmp Γ⊢E (TAAsrt _ _ _) (EAsrt _ _ _) (ECAsrt _ _) = RCTpl (λ ())
+  -}

@@ -18,33 +18,35 @@ module preservation where
   preservation ctxcons (TAVar tah) (EVar h) with env-all-Γ ctxcons tah
   ... | π3 , π4 , π5 rewrite ctxunicity h π4 = π5
   preservation ctxcons (TAHole h) EHole = TAHole h ctxcons
-  preservation ctxcons (TATpl h1 h2 h3) (ETuple h4 h5 h6) =
-    TATpl (! h4 · h1) λ {i} rs[i]==r-i τs[i]==τ-i →
-      let
-        _ , es[i]==e-i = ∥l1∥==∥l2∥→l1[i]→l2[i] (! h1) τs[i]==τ-i
-        _ , ks[i]==k-i = ∥l1∥==∥l2∥→l1[i]→l2[i] h5 es[i]==e-i
-      in
-      preservation ctxcons (h3 es[i]==e-i τs[i]==τ-i) (h6 es[i]==e-i rs[i]==r-i ks[i]==k-i)
+  preservation ctxcons TAUnit EUnit = TAUnit
+  preservation ctxcons (TAPair _ ta1 ta2) (EPair eval1 eval2)
+    = TAPair (preservation ctxcons ta1 eval1 ) (preservation ctxcons ta2 eval2)
   preservation ctxcons (TACtor h1 h2 ta) (ECtor eval) = TACtor h1 h2 (preservation ctxcons ta eval)
   preservation ctxcons (TAApp _ ta-f ta-arg) (EApp CF∞ eval1 eval2 eval-ef) with preservation ctxcons ta-f eval1
-  ... | TALam ctxcons-Ef (TALam x#Γ ta-ef) =
+  ... | TALam ctxcons-Ef (TALam ta-ef) =
     preservation (EnvInd ctxcons-Ef (preservation ctxcons ta-arg eval2)) ta-ef eval-ef
   preservation ctxcons (TAApp _ ta-f ta-arg) (EAppFix CF∞ h eval1 eval2 eval-ef) rewrite h with preservation ctxcons ta-f eval1
-  ... | TAFix ctxcons-Ef (TAFix f#Γ x#Γ ta-ef) =
+  ... | TAFix ctxcons-Ef (TAFix ta-ef) =
     preservation (EnvInd (EnvInd ctxcons-Ef (preservation ctxcons ta-f eval1)) (preservation ctxcons ta-arg eval2)) ta-ef eval-ef
   preservation ctxcons (TAApp _ ta1 ta2) (EAppUnfinished eval1 _ _ eval2) =
     TAApp (preservation ctxcons ta1 eval1) (preservation ctxcons ta2 eval2)
-  preservation ctxcons (TAGet _ i<∥τs∥ ta) (EGet _ h eval) with preservation ctxcons ta eval
-  ... | TATpl _ h' = h' h i<∥τs∥
-  preservation ctxcons (TAGet n==∥τs∥ i<∥τs∥ ta) (EGetUnfinished eval h) rewrite n==∥τs∥ = TAGet i<∥τs∥ (preservation ctxcons ta eval)
+  preservation ctxcons (TAFst ta) (EFst eval)
+    with preservation ctxcons ta eval
+  ... | TAPair ta1 ta2 = ta1
+  preservation ctxcons (TAFst ta) (EFstUnfinished eval x)
+    = TAFst (preservation ctxcons ta eval)
+  preservation ctxcons (TASnd ta) (ESnd eval)
+    with preservation ctxcons ta eval
+  ... | TAPair ta1 ta2 = ta2
+  preservation ctxcons (TASnd ta) (ESndUnfinished eval x)
+    = TASnd (preservation ctxcons ta eval)
   preservation {Σ' = Σ'} ctxcons (TACase d∈Σ' ta h1 h2) (EMatch CF∞ form eval-e eval-ec) with h2 form
-  ... | _ , _ , _ , _ , c∈cctx2 , ta-ec with preservation ctxcons ta eval-e
+  ... | _ , _ , _ , c∈cctx2 , ta-ec with preservation ctxcons ta eval-e
   ... | TACtor {cctx = cctx} d∈Σ'2 c∈cctx ta' with ctxunicity {Γ = π1 Σ'} d∈Σ' d∈Σ'2
   ... | refl with ctxunicity {Γ = cctx} c∈cctx c∈cctx2
   ... | refl = preservation (EnvInd ctxcons ta') ta-ec eval-ec
   preservation ctxcons (TACase d∈Σ' ta h1 h2) (EMatchUnfinished eval h) =
     TACase d∈Σ' ctxcons (preservation ctxcons ta eval) h1 λ form' →
-      let p1 , _ , _ , _ , p2 , p3 = h2 form' in
-      p1 , _ , p2 , p3
-  preservation ctxcons (TAPF ta) EPF = TAPF ta
-  preservation ctxcons (TAAsrt _ ta1 ta2) (EAsrt eval1 eval2 _) = TATpl refl λ ()
+      let _ , _ , _ , p2 , p3 = h2 form' in
+      _ , p2 , p3
+  preservation ctxcons (TAAsrt _ ta1 ta2) (EAsrt eval1 eval2 _) = TAUnit

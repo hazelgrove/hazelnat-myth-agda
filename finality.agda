@@ -15,12 +15,12 @@ module finality where
                Δ , Σ' , Γ ⊢ e :: τ →
                E ⊢ e ⇒ r ⊣ k →
                r final
-  finality E-final ctxcons (TALam _ _) EFun = FLam E-final
-  finality E-final ctxcons (TAFix _ _ _) EFix = FFix E-final
+  finality E-final ctxcons (TALam _) EFun = FLam E-final
+  finality E-final ctxcons (TAFix _) EFix = FFix E-final
   finality (EF E-fin) ctxcons (TAVar _) (EVar h) = E-fin h
   finality E-final ctxcons (TAApp _ ta-f ta-arg) (EApp {Ef = Ef} {x} {r2 = r2} CF∞ eval-f eval-arg eval-ef)
     with preservation ctxcons ta-f eval-f
-  ... | TALam ctxcons-Ef (TALam _ ta-ef) =
+  ... | TALam ctxcons-Ef (TALam ta-ef) =
     finality (EF new-Ef-final) (EnvInd ctxcons-Ef (preservation ctxcons ta-arg eval-arg)) ta-ef eval-ef
     where
       new-Ef-final : ∀{x' rx'} → (x' , rx') ∈ (Ef ,, (x , r2)) → rx' final
@@ -30,7 +30,7 @@ module finality where
       new-Ef-final {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 = finality E-final ctxcons ta-arg eval-arg
   finality E-final ctxcons (TAApp _ ta-f ta-arg) (EAppFix {Ef = Ef} {f} {x} {ef} {r2 = r2} CF∞ h2 eval-f eval-arg eval-ef)
     rewrite h2 with preservation ctxcons ta-f eval-f
-  ... | TAFix ctxcons-Ef (TAFix _ _ ta-ef) =
+  ... | TAFix ctxcons-Ef (TAFix ta-ef) =
     finality (EF new-Ef+-final) new-ctxcons ta-ef eval-ef
     where
       new-ctxcons =
@@ -46,22 +46,23 @@ module finality where
       new-Ef+-final {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 = finality E-final ctxcons ta-arg eval-arg
   finality E-final ctxcons (TAApp h ta-f ta-arg) (EAppUnfinished eval-f h2 h3 eval-arg) =
     FAp (finality E-final ctxcons ta-f eval-f) (finality E-final ctxcons ta-arg eval-arg) h2 h3
-  finality E-final ctxcons (TATpl h h2 h3) (ETuple h4 h5 h6) =
-    FTpl (λ {i} rs[i] →
-      let
-        _ , es[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] (! h4) rs[i]
-        _ , ks[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] h5 es[i]
-        _ , τs[i] = ∥l1∥==∥l2∥→l1[i]→l2[i] h es[i]
-      in
-      finality E-final ctxcons (h3 es[i] τs[i]) (h6 es[i] rs[i] ks[i]))
-  finality E-final ctxcons (TAGet ∥rs⊫=∥τs∥ i<∥τs∥ ta) (EGet _ h eval)
+  finality E-final ctxcons TAUnit EUnit = FUnit
+  finality E-final ctxcons (TAPair _ ta1 ta2) (EPair eval1 eval2)
+    = FPair (finality E-final ctxcons ta1 eval1) (finality E-final ctxcons ta2 eval2)
+  finality E-final ctxcons (TAFst ta) (EFst eval)
     with finality E-final ctxcons ta eval
-  ... | FTpl all-fin = all-fin h
-  finality E-final ctxcons (TAGet h i<∥τs∥ ta) (EGetUnfinished eval h2) = FGet (finality E-final ctxcons ta eval) h2
+  ... | FPair fin _ = fin
+  finality E-final ctxcons (TAFst ta) (EFstUnfinished eval ne)
+    = FFst (finality E-final ctxcons ta eval) ne
+  finality E-final ctxcons (TASnd ta) (ESnd eval)
+    with finality E-final ctxcons ta eval
+  ... | FPair _ fin = fin
+  finality E-final ctxcons (TASnd ta) (ESndUnfinished eval ne)
+    = FSnd (finality E-final ctxcons ta eval) ne
   finality E-final ctxcons (TACtor h h2 ta) (ECtor eval) = FCon (finality E-final ctxcons ta eval)
   finality {Σ' = Σ'} (EF E-fin) ctxcons (TACase d∈Σ'1 ta h1 h2) (EMatch {E = E} {xc = xc} {r' = r'} CF∞ form eval eval-ec)
     with h2 form
-  ...  | _ , _ , _ , _ , c∈cctx1 , ta-ec
+  ...  | _ , _ , _ , c∈cctx1 , ta-ec
     with preservation ctxcons ta eval
   ...  | TACtor {cctx = cctx} d∈Σ' c∈cctx ta-r'
     rewrite ctxunicity {Γ = π1 Σ'} d∈Σ'1 d∈Σ' | ctxunicity {Γ = cctx} c∈cctx1 c∈cctx =
@@ -74,7 +75,4 @@ module finality where
         ... | FCon r'-fin = r'-fin
   finality E-final ctxcons (TACase h ta h2 h3) (EMatchUnfinished eval h4) = FCase (finality E-final ctxcons ta eval) h4 E-final
   finality E-final ctxcons (TAHole _) EHole = FHole E-final
-  finality E-final ctxcons (TAPF ta) EPF
-    with ex-ta-value ta
-  ... | EXVPF pf-val = FPF (pf-value-final pf-val)
-  finality E-final ctxcons (TAAsrt _ _ _) (EAsrt _ _ _) = FTpl (λ ())
+  finality E-final ctxcons (TAAsrt _ _ _) (EAsrt _ _ _) = FUnit

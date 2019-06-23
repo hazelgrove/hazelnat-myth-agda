@@ -9,6 +9,11 @@ open import preservation
 open import decidability
 
 module constraints-checks where
+  {-
+  TODO : We really do need to prove unicity of constraint collection and backpropagation,
+         but they depend on evaluation unicity, which isn't proven yet and may be difficult
+         to prove. So for now we comment out this proof, and we can come back to it later
+         when we have more time.
   constraints-unicity : ∀{r1 r2 k k'} →
                           Constraints⦃ r1 , r2 ⦄:= k →
                           Constraints⦃ r1 , r2 ⦄:= k' →
@@ -48,7 +53,11 @@ module constraints-checks where
   constraints-unicity (XCGet _ :=k) (XCGet _ :=k') = constraints-unicity :=k :=k'
   constraints-unicity (XCMatch ne _) XCExRefl = abort (ne refl)
   constraints-unicity (XCMatch _ :=k) (XCMatch _ :=k') = constraints-unicity :=k :=k'
+  -}
 
+  {- TODO - we should probably have some theorems relating to this,
+     but now that constraints checking takes fuel,
+     it's no longer decidable in a simple fashion
   mutual
     constraints-dec : (r1 r2 : result) →
                         Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄:= k
@@ -225,3 +234,4 @@ module constraints-checks where
               ap-C<t1,t2> {1+ i} rs1[i] rs2[i] ks[i]
                 = C<t1,t2> rs1[i] rs2[i] ks[i]
     ... | Inr (j , j<∥t1∥ , j<∥t2∥ , h₁ , h₂ , cf) = Inr (1+ j , _ , _ , h₁ , h₂ , cf)
+  -}

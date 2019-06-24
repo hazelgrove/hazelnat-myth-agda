@@ -13,7 +13,6 @@ module preservation where
                    Δ , Σ' , Γ ⊢ e :: τ →
                    E ⊢ e ⇒ r ⊣ k →
                    Δ , Σ' ⊢ r ·: τ
-  preservation ctxcons ta EFun = TALam ctxcons ta
   preservation ctxcons ta EFix = TAFix ctxcons ta
   preservation ctxcons (TAVar tah) (EVar h) with env-all-Γ ctxcons tah
   ... | π3 , π4 , π5 rewrite ctxunicity h π4 = π5
@@ -22,13 +21,10 @@ module preservation where
   preservation ctxcons (TAPair _ ta1 ta2) (EPair eval1 eval2)
     = TAPair (preservation ctxcons ta1 eval1 ) (preservation ctxcons ta2 eval2)
   preservation ctxcons (TACtor h1 h2 ta) (ECtor eval) = TACtor h1 h2 (preservation ctxcons ta eval)
-  preservation ctxcons (TAApp _ ta-f ta-arg) (EApp CF∞ eval1 eval2 eval-ef) with preservation ctxcons ta-f eval1
-  ... | TALam ctxcons-Ef (TALam ta-ef) =
-    preservation (EnvInd ctxcons-Ef (preservation ctxcons ta-arg eval2)) ta-ef eval-ef
   preservation ctxcons (TAApp _ ta-f ta-arg) (EAppFix CF∞ h eval1 eval2 eval-ef) rewrite h with preservation ctxcons ta-f eval1
   ... | TAFix ctxcons-Ef (TAFix ta-ef) =
     preservation (EnvInd (EnvInd ctxcons-Ef (preservation ctxcons ta-f eval1)) (preservation ctxcons ta-arg eval2)) ta-ef eval-ef
-  preservation ctxcons (TAApp _ ta1 ta2) (EAppUnfinished eval1 _ _ eval2) =
+  preservation ctxcons (TAApp _ ta1 ta2) (EAppUnfinished eval1 _ eval2) =
     TAApp (preservation ctxcons ta1 eval1) (preservation ctxcons ta2 eval2)
   preservation ctxcons (TAFst ta) (EFst eval)
     with preservation ctxcons ta eval

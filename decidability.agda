@@ -100,24 +100,6 @@ module decidability where
     ex-==-dec (x ↦ ex1) ¿¿ = Inr (λ ())
 
     exp-==-dec : (e1 e2 : exp) → e1 == e2 ∨ e1 ≠ e2
-    exp-==-dec (·λ x1 => e1) (·λ x2 => e2)
-      with natEQ x1 x2
-    ... | Inr ne   = Inr (λ where refl → ne refl)
-    ... | Inl refl
-      with exp-==-dec e1 e2
-    ... | Inr ne   = Inr (λ where refl → ne refl)
-    ... | Inl refl = Inl refl
-    exp-==-dec (·λ x1 => e1) fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
-    exp-==-dec (·λ x1 => e1) X[ x ] = Inr (λ ())
-    exp-==-dec (·λ x1 => e1) (e2 ∘ e3) = Inr (λ ())
-    exp-==-dec (·λ x => e1) ⟨⟩ = Inr (λ ())
-    exp-==-dec (·λ x => e1) ⟨ e2 , e3 ⟩ = Inr (λ ())
-    exp-==-dec (·λ x => e1) (fst e2) = Inr (λ ())
-    exp-==-dec (·λ x => e1) (snd e2) = Inr (λ ())
-    exp-==-dec (·λ x1 => e1) (C[ x ] e2) = Inr (λ ())
-    exp-==-dec (·λ x1 => e1) case e2 of⦃· x ·⦄ = Inr (λ ())
-    exp-==-dec (·λ x1 => e1) ??[ x ] = Inr (λ ())
-    exp-==-dec (·λ x1 => e1) (PBE:assert e2 e3) = Inr (λ ())
     exp-==-dec fix f1 ⦇·λ x1 => e1 ·⦈ fix f2 ⦇·λ x2 => e2 ·⦈
       with natEQ f1 f2
     ... | Inr ne   = Inr (λ where refl → ne refl)
@@ -128,7 +110,6 @@ module decidability where
       with exp-==-dec e1 e2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec fix f1 ⦇·λ x1 => e1 ·⦈ (·λ x => e2) = Inr (λ ())
     exp-==-dec fix f1 ⦇·λ x1 => e1 ·⦈ X[ x ] = Inr (λ ())
     exp-==-dec fix f1 ⦇·λ x1 => e1 ·⦈ (e2 ∘ e3) = Inr (λ ())
     exp-==-dec fix f1 ⦇·λ x1 => e1 ·⦈ ⟨⟩ = Inr (λ ())
@@ -143,7 +124,6 @@ module decidability where
       with natEQ x1 x2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec X[ x1 ] (·λ x => e2) = Inr (λ ())
     exp-==-dec X[ x1 ] fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec X[ x1 ] (e2 ∘ e3) = Inr (λ ())
     exp-==-dec X[ x1 ] ⟨⟩ = Inr (λ ())
@@ -161,7 +141,6 @@ module decidability where
       with exp-==-dec earg1 earg2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec (ef1 ∘ earg1) (·λ x => e2) = Inr (λ ())
     exp-==-dec (ef1 ∘ earg1) fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec (ef1 ∘ earg1) X[ x ] = Inr (λ ())
     exp-==-dec (ef1 ∘ earg1) ⟨⟩ = Inr (λ ())
@@ -173,7 +152,6 @@ module decidability where
     exp-==-dec (ef1 ∘ earg1) ??[ x ] = Inr (λ ())
     exp-==-dec (ef1 ∘ earg1) (PBE:assert e2 e3) = Inr (λ ())
     exp-==-dec ⟨⟩ ⟨⟩ = Inl refl
-    exp-==-dec ⟨⟩ (·λ x => e2) = Inr (λ ())
     exp-==-dec ⟨⟩ fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec ⟨⟩ X[ x ] = Inr (λ ())
     exp-==-dec ⟨⟩ (e2 ∘ e3) = Inr (λ ())
@@ -191,7 +169,6 @@ module decidability where
       with exp-==-dec es1b es2b
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec ⟨ _ , _ ⟩ (·λ x => e2) = Inr (λ ())
     exp-==-dec ⟨ _ , _ ⟩ fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec ⟨ _ , _ ⟩ X[ x ] = Inr (λ ())
     exp-==-dec ⟨ _ , _ ⟩ (e2 ∘ e3) = Inr (λ ())
@@ -206,7 +183,6 @@ module decidability where
       with exp-==-dec e1 e2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec (fst e1) (·λ x => e2) = Inr (λ ())
     exp-==-dec (fst e1) fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec (fst e1) X[ x ] = Inr (λ ())
     exp-==-dec (fst e1) (e2 ∘ e3) = Inr (λ ())
@@ -221,7 +197,6 @@ module decidability where
       with exp-==-dec e1 e2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec (snd e1) (·λ x => e2) = Inr (λ ())
     exp-==-dec (snd e1) fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec (snd e1) X[ x ] = Inr (λ ())
     exp-==-dec (snd e1) (e2 ∘ e3) = Inr (λ ())
@@ -239,7 +214,6 @@ module decidability where
       with exp-==-dec e1 e2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec (C[ c1 ] e1) (·λ x => e2) = Inr (λ ())
     exp-==-dec (C[ c1 ] e1) fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec (C[ c1 ] e1) X[ x ] = Inr (λ ())
     exp-==-dec (C[ c1 ] e1) (e2 ∘ e3) = Inr (λ ())
@@ -257,7 +231,6 @@ module decidability where
       with ctx<rule>-==-dec rules1 rules2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec case e1 of⦃· rules1 ·⦄ (·λ x => e2) = Inr (λ ())
     exp-==-dec case e1 of⦃· rules1 ·⦄ fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec case e1 of⦃· rules1 ·⦄ X[ x ] = Inr (λ ())
     exp-==-dec case e1 of⦃· rules1 ·⦄ (e2 ∘ e3) = Inr (λ ())
@@ -272,7 +245,6 @@ module decidability where
       with natEQ u1 u2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec ??[ u1 ] (·λ x => e2) = Inr (λ ())
     exp-==-dec ??[ u1 ] fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec ??[ u1 ] X[ x ] = Inr (λ ())
     exp-==-dec ??[ u1 ] (e2 ∘ e3) = Inr (λ ())
@@ -290,7 +262,6 @@ module decidability where
       with exp-==-dec e1b e2b
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    exp-==-dec (PBE:assert e1a e1b) (·λ x => e2) = Inr (λ ())
     exp-==-dec (PBE:assert e1a e1b) fix x ⦇·λ x₁ => e2 ·⦈ = Inr (λ ())
     exp-==-dec (PBE:assert e1a e1b) X[ x ] = Inr (λ ())
     exp-==-dec (PBE:assert e1a e1b) (e2 ∘ e3) = Inr (λ ())
@@ -303,26 +274,6 @@ module decidability where
     exp-==-dec (PBE:assert e1a e1b) ??[ x ] = Inr (λ ())
 
     result-==-dec : (r1 r2 : result) → r1 == r2 ∨ r1 ≠ r2
-    result-==-dec ([ E1 ]λ x1 => e1) ([ E2 ]λ x2 => e2)
-      with ctx<result>-==-dec E1 E2
-    ... | Inr ne   = Inr λ where refl → ne refl
-    ... | Inl refl
-      with natEQ x1 x2
-    ... | Inr ne   = Inr λ where refl → ne refl
-    ... | Inl refl
-      with exp-==-dec e1 e2
-    ... | Inr ne   = Inr λ where refl → ne refl
-    ... | Inl refl = Inl refl
-    result-==-dec ([ E ]λ x => e) [ _ ]fix _ ⦇·λ _ => _ ·⦈ = Inr λ ()
-    result-==-dec ([ E ]λ x => e) ⟨⟩ = Inr (λ ())
-    result-==-dec ([ E ]λ x => e) ⟨ _ , _ ⟩ = Inr (λ ())
-    result-==-dec ([ E ]λ x => e) (C[ _ ] _) = Inr (λ ())
-    result-==-dec ([ x ]λ x₁ => x₂) (C⁻[ x₃ ] r2) = Inr (λ ())
-    result-==-dec ([ E ]λ x => e) [ _ ]??[ _ ] = Inr (λ ())
-    result-==-dec ([ E ]λ x => e) (_ ∘ _) = Inr (λ ())
-    result-==-dec ([ E ]λ x => e) (fst _) = Inr (λ ())
-    result-==-dec ([ E ]λ x => e) (snd _) = Inr (λ ())
-    result-==-dec ([ E ]λ x => e) [ _ ]case _ of⦃· _ ·⦄ = Inr (λ ())
     result-==-dec [ E1 ]fix f1 ⦇·λ x1 => e1 ·⦈ [ E2 ]fix f2 ⦇·λ x2 => e2 ·⦈
       with ctx<result>-==-dec E1 E2
     ... | Inr ne   = Inr λ where refl → ne refl
@@ -336,7 +287,6 @@ module decidability where
       with exp-==-dec e1 e2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
-    result-==-dec [ E ]fix f ⦇·λ x => e ·⦈ ([ _ ]λ _ => _) = Inr (λ ())
     result-==-dec [ E ]fix f ⦇·λ x => e ·⦈ ⟨⟩ = Inr (λ ())
     result-==-dec [ E ]fix f ⦇·λ x => e ·⦈ ⟨ _ , _ ⟩ = Inr (λ ())
     result-==-dec [ E ]fix f ⦇·λ x => e ·⦈ (C[ _ ] _) = Inr (λ ())
@@ -347,7 +297,6 @@ module decidability where
     result-==-dec [ E ]fix f ⦇·λ x => e ·⦈ (snd _) = Inr (λ ())
     result-==-dec [ E ]fix f ⦇·λ x => e ·⦈ [ _ ]case _ of⦃· _ ·⦄ = Inr (λ ())
     result-==-dec ⟨⟩ ⟨⟩ = Inl refl
-    result-==-dec ⟨⟩ ([ x ]λ x₁ => x₂) = Inr (λ ())
     result-==-dec ⟨⟩ [ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ = Inr (λ ())
     result-==-dec ⟨⟩ ⟨ r2 , r3 ⟩ = Inr (λ ())
     result-==-dec ⟨⟩ (C[ x ] r2) = Inr (λ ())
@@ -364,7 +313,6 @@ module decidability where
       with result-==-dec rs1b rs2b
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
-    result-==-dec ⟨ _ , _ ⟩ ([ _ ]λ _ => _) = Inr (λ ())
     result-==-dec ⟨ _ , _ ⟩ [ _ ]fix _ ⦇·λ _ => _ ·⦈ = Inr (λ ())
     result-==-dec ⟨ _ , _ ⟩ ⟨⟩ = Inr (λ ())
     result-==-dec ⟨ _ , _ ⟩ (C[ _ ] _) = Inr (λ ())
@@ -381,7 +329,6 @@ module decidability where
       with result-==-dec r1 r2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
-    result-==-dec (C[ c ] r) ([ _ ]λ _ => _) = Inr (λ ())
     result-==-dec (C[ c ] r) [ _ ]fix _ ⦇·λ _ => _ ·⦈ = Inr (λ ())
     result-==-dec (C[ c ] r) ⟨⟩ = Inr (λ ())
     result-==-dec (C[ c ] r) ⟨ _ , _ ⟩ = Inr (λ ())
@@ -398,7 +345,6 @@ module decidability where
       with result-==-dec r1 r2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
-    result-==-dec (C⁻[ x ] r1) ([ x₁ ]λ x₂ => x₃) = Inr (λ ())
     result-==-dec (C⁻[ x ] r1) [ x₁ ]fix x₂ ⦇·λ x₃ => x₄ ·⦈ = Inr (λ ())
     result-==-dec (C⁻[ x ] r1) ⟨⟩ = Inr (λ ())
     result-==-dec (C⁻[ x ] r1) ⟨ r2 , r3 ⟩ = Inr (λ ())
@@ -415,7 +361,6 @@ module decidability where
       with natEQ u1 u2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
-    result-==-dec [ E ]??[ u1 ] ([ _ ]λ _ => _) = Inr (λ ())
     result-==-dec [ E ]??[ u1 ] [ _ ]fix _ ⦇·λ _ => _ ·⦈ = Inr (λ ())
     result-==-dec [ E ]??[ u1 ] ⟨⟩ = Inr (λ ())
     result-==-dec [ E ]??[ u1 ] ⟨ _ , _ ⟩ = Inr (λ ())
@@ -432,7 +377,6 @@ module decidability where
       with result-==-dec rarg1 rarg2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
-    result-==-dec (rf ∘ rarg) ([ _ ]λ _ => _) = Inr (λ ())
     result-==-dec (rf ∘ rarg) [ _ ]fix _ ⦇·λ _ => _ ·⦈ = Inr (λ ())
     result-==-dec (rf ∘ rarg) ⟨⟩ = Inr (λ ())
     result-==-dec (rf ∘ rarg) ⟨ _ , _ ⟩ = Inr (λ ())
@@ -446,7 +390,6 @@ module decidability where
       with result-==-dec r1 r2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    result-==-dec (fst r1) ([ x ]λ x₁ => x₂) = Inr (λ ())
     result-==-dec (fst r1) [ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ = Inr (λ ())
     result-==-dec (fst r1) ⟨⟩ = Inr (λ ())
     result-==-dec (fst r1) ⟨ r2 , r3 ⟩ = Inr (λ ())
@@ -460,7 +403,6 @@ module decidability where
       with result-==-dec r1 r2
     ... | Inr ne   = Inr (λ where refl → ne refl)
     ... | Inl refl = Inl refl
-    result-==-dec (snd r1) ([ x ]λ x₁ => x₂) = Inr (λ ())
     result-==-dec (snd r1) [ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ = Inr (λ ())
     result-==-dec (snd r1) ⟨⟩ = Inr (λ ())
     result-==-dec (snd r1) ⟨ r2 , r3 ⟩ = Inr (λ ())
@@ -480,7 +422,6 @@ module decidability where
       with ctx<rule>-==-dec rules1 rules2
     ... | Inr ne   = Inr λ where refl → ne refl
     ... | Inl refl = Inl refl
-    result-==-dec [ E ]case r of⦃· rules ·⦄ ([ _ ]λ _ => _) = Inr (λ ())
     result-==-dec [ E ]case r of⦃· rules ·⦄ [ _ ]fix _ ⦇·λ _ => _ ·⦈ = Inr (λ ())
     result-==-dec [ E ]case r of⦃· rules ·⦄ ⟨⟩ = Inr (λ ())
     result-==-dec [ E ]case r of⦃· rules ·⦄ ⟨ _ , _ ⟩ = Inr (λ ())
@@ -528,10 +469,6 @@ module decidability where
 
   env-final-dec : ∀{E} → E env-final ∨ (E env-final → ⊥)
 
-  final-dec {[ E ]λ x₁ => e}
-    with env-final-dec {E}
-  ... | Inr nf  = Inr (λ {(FLam f) → nf f})
-  ... | Inl E-f = Inl (FLam E-f)
   final-dec {[ E ]fix x₁ ⦇·λ x₂ => e ·⦈}
     with env-final-dec {E}
   ... | Inr nf  = Inr (λ {(FFix f) → nf f})
@@ -555,28 +492,25 @@ module decidability where
   ... | Inl E-f = Inl (FHole E-f)
   final-dec {r1 ∘ r2}
     with final-dec {r1}
-  ... | Inr nf   = Inr λ {(FAp h _ _ _) → nf h}
+  ... | Inr nf   = Inr λ {(FAp h _ _) → nf h}
   ... | Inl r1-f
     with final-dec {r2}
-  ... | Inr nf   = Inr λ {(FAp _ h _ _) → nf h}
-  final-dec {([ x ]λ x₁ => x₂) ∘ r2} | Inl r1-f | Inl r2-f
-    = Inr λ {(FAp _ _ h _) → abort (h refl)}
+  ... | Inr nf   = Inr λ {(FAp _ h _) → nf h}
   final-dec {[ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ ∘ r2} | Inl r1-f | Inl r2-f
-    = Inr λ {(FAp _ _ _ h) → abort (h refl)}
-  final-dec {⟨⟩ ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
-  final-dec {⟨ r1 , r3 ⟩ ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
-  final-dec {(C[ x ] r1) ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
-  final-dec {[ x ]??[ x₁ ] ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
-  final-dec {(r1 ∘ r3) ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
-  final-dec {fst r1 ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
-  final-dec {snd r1 ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
-  final-dec {[ x ]case r1 of⦃· x₁ ·⦄ ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {x} {e} ()) (λ {E} {f} {x} {e} ()))
+    = Inr λ {(FAp _ _ h) → abort (h refl)}
+  final-dec {⟨⟩ ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {f} {x} {e} ()))
+  final-dec {⟨ r1 , r3 ⟩ ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {f} {x} {e} ()))
+  final-dec {(C[ x ] r1) ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {f} {x} {e} ()))
+  final-dec {[ x ]??[ x₁ ] ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f  (λ {E} {f} {x} {e} ()))
+  final-dec {(r1 ∘ r3) ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {f} {x} {e} ()))
+  final-dec {fst r1 ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {f} {x} {e} ()))
+  final-dec {snd r1 ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {f} {x} {e} ()))
+  final-dec {[ x ]case r1 of⦃· x₁ ·⦄ ∘ r2} | Inl r1-f | Inl r2-f = Inl (FAp r1-f r2-f (λ {E} {f} {x} {e} ()))
   final-dec {fst r}
     with final-dec {r}
   ... | Inr nf  = Inr λ {(FFst h _) → nf h}
   final-dec {fst ⟨ r , r₁ ⟩} | Inl r-f
     = Inr λ {(FFst _ h) → abort (h refl)}
-  final-dec {fst ([ x ]λ x₁ => x₂)} | Inl r-f = Inl (FFst r-f (λ {r1} {r2} ()))
   final-dec {fst [ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈} | Inl r-f = Inl (FFst r-f (λ {r1} {r2} ()))
   final-dec {fst ⟨⟩} | Inl r-f = Inl (FFst r-f (λ {r1} {r2} ()))
   final-dec {fst (C[ x ] r)} | Inl r-f = Inl (FFst r-f (λ {r1} {r2} ()))
@@ -590,7 +524,6 @@ module decidability where
   ... | Inr nf  = Inr λ {(FSnd h _) → nf h}
   final-dec {snd ⟨ r , r₁ ⟩} | Inl r-f
     = Inr λ {(FSnd _ h) → abort (h refl)}
-  final-dec {snd ([ x ]λ x₁ => x₂)} | Inl r-f = Inl (FSnd r-f (λ {r1} {r2} ()))
   final-dec {snd [ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈} | Inl r-f = Inl (FSnd r-f (λ {r1} {r2} ()))
   final-dec {snd ⟨⟩} | Inl r-f = Inl (FSnd r-f (λ {r1} {r2} ()))
   final-dec {snd (C[ x ] r)} | Inl r-f = Inl (FSnd r-f (λ {r1} {r2} ()))
@@ -607,7 +540,6 @@ module decidability where
   ... | Inr nf  = Inr λ {(FCase _ _ h) → nf h}
   final-dec {[ E ]case C[ x ] r of⦃· x₁ ·⦄} | Inl r-f | Inl E-f
     = Inr λ {(FCase _ h _) → abort (h refl)}
-  final-dec {[ E ]case [ x ]λ x₂ => x₃ of⦃· x₁ ·⦄} | Inl r-f | Inl E-f = Inl (FCase r-f (λ {c} {r'} ()) E-f)
   final-dec {[ E ]case [ x ]fix x₂ ⦇·λ x₃ => x₄ ·⦈ of⦃· x₁ ·⦄} | Inl r-f | Inl E-f = Inl (FCase r-f (λ {c} {r'} ()) E-f)
   final-dec {[ E ]case ⟨⟩ of⦃· x₁ ·⦄} | Inl r-f | Inl E-f = Inl (FCase r-f (λ {c} {r'} ()) E-f)
   final-dec {[ E ]case ⟨ r , r₁ ⟩ of⦃· x₁ ·⦄} | Inl r-f | Inl E-f = Inl (FCase r-f (λ {c} {r'} ()) E-f)
@@ -627,7 +559,6 @@ module decidability where
   ... | Inl (EF E-f) = Inl (EF λ {InH → r-f ; (InT h) → E-f h})
 
   Coerce-dec : ∀{r} → Σ[ ex ∈ ex ] (Coerce r := ex) ∨ (Σ[ ex ∈ ex ] (Coerce r := ex) → ⊥)
-  Coerce-dec {[ x ]λ x₁ => x₂} = Inr (λ where (_ , ()))
   Coerce-dec {[ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈} = Inr (λ where (_ , ()))
   Coerce-dec {⟨⟩} = Inl (⟨⟩ , CoerceUnit)
   Coerce-dec {⟨ r1 , r2 ⟩}
@@ -649,10 +580,6 @@ module decidability where
   Coerce-dec {[ x ]case r of⦃· x₁ ·⦄} = Inr (λ where (_ , ()))
 
   value-dec : ∀{r} → r value ∨ (r value → ⊥)
-  value-dec {[ E ]λ x₁ => x₂}
-    with env-final-dec {E}
-  ... | Inr nf  = Inr (λ {(VLam E-f) → nf E-f})
-  ... | Inl E-f = Inl (VLam E-f)
   value-dec {[ E ]fix x₁ ⦇·λ x₂ => x₃ ·⦈}
     with env-final-dec {E}
   ... | Inr nf  = Inr (λ {(VFix E-f) → nf E-f})

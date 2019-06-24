@@ -13,7 +13,6 @@ module lemmas-progress where
                            Δ , Σ' , Γ ⊢ e :: τ →
                            Σ[ r ∈ result ] (Δ , Σ' ⊢ r ·: τ)
 
-  typ-inhabitance-pres Γ⊢E ta@(TALam e-ta)   = _ , (TALam Γ⊢E ta)
   typ-inhabitance-pres Γ⊢E ta@(TAFix e-ta) = _ , (TAFix Γ⊢E ta)
   typ-inhabitance-pres Γ⊢E (TAVar x∈Γ)
     with env-all-Γ Γ⊢E x∈Γ

@@ -60,7 +60,6 @@ module core where
 
     -- Expressions (Sketches)
     data exp : Set where
-      ·λ_=>_        : Nat → exp → exp
       fix_⦇·λ_=>_·⦈ : Nat → Nat → exp → exp
       X[_]          : Nat → exp
       _∘_           : exp → exp → exp
@@ -74,7 +73,6 @@ module core where
       PBE:assert    : exp → exp → exp
 
     data hole-name-new : (e : exp) → (u : Nat) → Set where
-      HNNLam  : ∀{x e u} → hole-name-new e u → hole-name-new (·λ x => e) u
       HNNFix  : ∀{x f e u} → hole-name-new e u → hole-name-new (fix f ⦇·λ x => e ·⦈) u
       HNNVar  : ∀{x u} → hole-name-new (X[ x ]) u
       HNNAp   : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (e1 ∘ e2) u
@@ -91,7 +89,6 @@ module core where
       HNNAsrt : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (PBE:assert e1 e2) u
 
     data holes-disjoint : (e1 : exp) → (e2 : exp) → Set where
-      HDLam  : ∀{x e e'} → holes-disjoint e e' → holes-disjoint (·λ x => e) e'
       HDFix  : ∀{x f e e'} → holes-disjoint e e' → holes-disjoint (fix f ⦇·λ x => e ·⦈) e'
       HDVar  : ∀{x e'} → holes-disjoint (X[ x ]) e'
       HDAp   : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (e1 ∘ e2) e'
@@ -108,7 +105,6 @@ module core where
       HDAsrt : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (PBE:assert e1 e2) e'
 
     data _ecomplete : exp → Set where
-      ECLam  : ∀{x e} → e ecomplete → (·λ x => e) ecomplete
       ECFix  : ∀{f x e} → e ecomplete → fix f ⦇·λ x => e ·⦈ ecomplete
       ECVar  : ∀{x} → X[ x ] ecomplete
       ECAp   : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (e1 ∘ e2) ecomplete
@@ -125,9 +121,6 @@ module core where
 
     -- type assignment for expressions
     data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
-      TALam  : ∀{Δ Σ' Γ x e τ1 τ2} →
-                 Δ , Σ' , (Γ ,, (x , τ1)) ⊢ e :: τ2 →
-                 Δ , Σ' , Γ ⊢ ·λ x => e :: τ1 ==> τ2
       TAFix  : ∀{Δ Σ' Γ f x e τ1 τ2} →
                  Δ , Σ' , (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢ e :: τ2 →
                  Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ1 ==> τ2
@@ -186,7 +179,6 @@ module core where
 
     -- results - evaluation takes expressions to results, but results aren't necessarily final
     data result : Set where
-      [_]λ_=>_         : env → Nat → exp → result
       [_]fix_⦇·λ_=>_·⦈ : env → Nat → Nat → exp → result
       ⟨⟩               : result
       ⟨_,_⟩            : result → result → result
@@ -200,7 +192,6 @@ module core where
 
     -- values are final and almost complete (i.e. they can only have holes in environments or under binders)
     data _value : result → Set where
-      VLam  : ∀{E x e} → E env-final → ([ E ]λ x => e) value
       VFix  : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ value
       VUnit : ⟨⟩ value
       VPair : ∀{r1 r2} → r1 value → r2 value → ⟨ r1 , r2 ⟩ value
@@ -208,20 +199,18 @@ module core where
 
     -- final results are those that cannot be evaluated further
     data _final : result → Set where
-      FLam  : ∀{E x e} → E env-final → ([ E ]λ x => e) final
       FFix  : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ final
       FUnit : ⟨⟩ final
       FPair : ∀{r1 r2} → r1 final → r2 final → ⟨ r1 , r2 ⟩ final
       FCon  : ∀{c r} → r final → (C[ c ] r) final
       FHole : ∀{E u} → E env-final → [ E ]??[ u ] final
-      FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E x e} → r1 ≠ ([ E ]λ x => e)) → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
+      FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
       FFst  : ∀{r} → r final → (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) → (fst r) final
       FSnd  : ∀{r} → r final → (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) → (snd r) final
       FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → E env-final → [ E ]case r of⦃· rules ·⦄ final
 
     -- complete results have no holes at all
     data _rcomplete : result → Set where
-      RCLam  : ∀{E x e} → E env-complete → e ecomplete → ([ E ]λ x => e) rcomplete
       RCFix  : ∀{E f x e} → E env-complete → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ rcomplete
       RCUnit : ⟨⟩ rcomplete
       RCPair : ∀{r1 r2} → r1 rcomplete → r2 rcomplete → ⟨ r1 , r2 ⟩ rcomplete
@@ -244,10 +233,6 @@ module core where
 
     -- type assignment for results
     data _,_⊢_·:_ : hctx → denv → result → typ → Set where
-      TALam        : ∀{Δ Σ' Γ E x e τ} →
-                       Δ , Σ' , Γ ⊢ E →
-                       Δ , Σ' , Γ ⊢ ·λ x => e :: τ →
-                       Δ , Σ' ⊢ [ E ]λ x => e ·: τ
       TAFix        : ∀{Δ Σ' Γ E f x e τ} →
                        Δ , Σ' , Γ ⊢ E →
                        Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ →
@@ -383,11 +368,6 @@ module core where
                        v value →
                        r ⇐ v ↦ ex ⌊ ⛽ ⌋:= k →
                        (r ∘ v) ⇐ ex ⌊ ⛽ ⌋:= k
-      XBFun        : ∀{⛽ ⛽↓ E x e v ex r k1 k2} →
-                       ⛽ ⛽⇓ ⛽↓ →
-                       (E ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒ r ⊣ k1 →
-                       r ⇐ ex ⌊ ⛽↓ ⌋:= k2 →
-                       ([ E ]λ x => e) ⇐ v ↦ ex ⌊ ⛽ ⌋:= k1 ++ k2
       XBFix        : ∀{⛽ ⛽↓ E f x e rf v ex r k1 k2} →
                        ⛽ ⛽⇓ ⛽↓ →
                        rf == [ E ]fix f ⦇·λ x => e ·⦈ →
@@ -426,7 +406,6 @@ module core where
 
     -- Generic big step evaluation
     data _⊢_⌊_⌋⇒_⊣_ : env → exp → Fuel → result → constraints → Set where
-      EFun             : ∀{E ⛽ x e} → E ⊢ ·λ x => e ⌊ ⛽ ⌋⇒ [ E ]λ x => e ⊣ []
       EFix             : ∀{E ⛽ f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
       EVar             : ∀{E ⛽ x r} → (x , r) ∈ E → E ⊢ X[ x ] ⌊ ⛽ ⌋⇒ r ⊣ []
       EHole            : ∀{E ⛽ u} → E ⊢ ??[ u ] ⌊ ⛽ ⌋⇒ [ E ]??[ u ] ⊣ []
@@ -438,12 +417,6 @@ module core where
       ECtor            : ∀{E ⛽ c e r k} →
                            E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ k →
                            E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ k
-      EApp             : ∀{E ⛽ ⛽↓ e1 e2 Ef x ef kf r2 k2 r k} →
-                           ⛽ ⛽⇓ ⛽↓ →
-                           E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ kf →
-                           E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                           (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ k →
-                           E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ kf ++ k2 ++ k
       EAppFix          : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2 r k} →
                            ⛽ ⛽⇓ ⛽↓ →
                            r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
@@ -453,7 +426,6 @@ module core where
                            E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ k1 ++ k2 ++ k
       EAppUnfinished   : ∀{E ⛽ e1 e2 r1 k1 r2 k2} →
                            E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                           (∀{Ef x ef} → r1 ≠ ([ Ef ]λ x => ef)) →
                            (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
                            E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
                            E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ k1 ++ k2
@@ -563,15 +535,6 @@ module core where
                         v value →
                         r ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅ →
                         (r ∘ v) ⇐ ex ⌊ ⛽ ⌋:=∅
-      XBFFunEval    : ∀{⛽ ⛽↓ E x e v ex} →
-                        ⛽ ⛽⇓ ⛽↓ →
-                        (E ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒∅ →
-                        ([ E ]λ x => e) ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅
-      XBFFun        : ∀{⛽ ⛽↓ E x e v ex r k} →
-                        ⛽ ⛽⇓ ⛽↓ →
-                        (E ,, (x , v)) ⊢ e ⌊ ⛽↓ ⌋⇒ r ⊣ k →
-                        r ⇐ ex ⌊ ⛽↓ ⌋:=∅ →
-                        ([ E ]λ x => e) ⇐ v ↦ ex ⌊ ⛽ ⌋:=∅
       XBFFixEval    : ∀{⛽ ⛽↓ E f x e rf v ex} →
                         ⛽ ⛽⇓ ⛽↓ →
                         rf == [ E ]fix f ⦇·λ x => e ·⦈ →
@@ -633,12 +596,6 @@ module core where
                        E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
       EFAppArg     : ∀{E ⛽ e1 e2} →
                        E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
-                       E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
-      EFAppEval    : ∀{E ⛽ ⛽↓ e1 Ef x ef k1 e2 r2 k2} →
-                       ⛽ ⛽⇓ ⛽↓ →
-                       E ⊢ e1 ⌊ ⛽ ⌋⇒ ([ Ef ]λ x => ef) ⊣ k1 →
-                       E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
-                       (Ef ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
                        E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
       EFAppFixEval : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2} →
                        ⛽ ⛽⇓ ⛽↓ →

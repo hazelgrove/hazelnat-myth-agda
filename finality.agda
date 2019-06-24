@@ -15,19 +15,8 @@ module finality where
                Δ , Σ' , Γ ⊢ e :: τ →
                E ⊢ e ⇒ r ⊣ k →
                r final
-  finality E-final ctxcons (TALam _) EFun = FLam E-final
   finality E-final ctxcons (TAFix _) EFix = FFix E-final
   finality (EF E-fin) ctxcons (TAVar _) (EVar h) = E-fin h
-  finality E-final ctxcons (TAApp _ ta-f ta-arg) (EApp {Ef = Ef} {x} {r2 = r2} CF∞ eval-f eval-arg eval-ef)
-    with preservation ctxcons ta-f eval-f
-  ... | TALam ctxcons-Ef (TALam ta-ef) =
-    finality (EF new-Ef-final) (EnvInd ctxcons-Ef (preservation ctxcons ta-arg eval-arg)) ta-ef eval-ef
-    where
-      new-Ef-final : ∀{x' rx'} → (x' , rx') ∈ (Ef ,, (x , r2)) → rx' final
-      new-Ef-final {x'} {rx'} h with ctx-split {Γ = Ef} h
-      new-Ef-final {x'} {rx'} h | Inl (_ , x'∈Ef) with finality E-final ctxcons ta-f eval-f
-      ... | FLam (EF Ef-fin) = Ef-fin x'∈Ef
-      new-Ef-final {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 = finality E-final ctxcons ta-arg eval-arg
   finality E-final ctxcons (TAApp _ ta-f ta-arg) (EAppFix {Ef = Ef} {f} {x} {ef} {r2 = r2} CF∞ h2 eval-f eval-arg eval-ef)
     rewrite h2 with preservation ctxcons ta-f eval-f
   ... | TAFix ctxcons-Ef (TAFix ta-ef) =
@@ -44,8 +33,8 @@ module finality where
       new-Ef+-final {x'} {rx'} h with ctx-split {Γ = Ef ,, (f , [ Ef ]fix f ⦇·λ x => ef ·⦈)} h
       new-Ef+-final {x'} {rx'} h | Inl (_ , x'∈Ef+) = new-Ef-final x'∈Ef+
       new-Ef+-final {x'} {rx'} h | Inr (_ , rx'==r2) rewrite rx'==r2 = finality E-final ctxcons ta-arg eval-arg
-  finality E-final ctxcons (TAApp h ta-f ta-arg) (EAppUnfinished eval-f h2 h3 eval-arg) =
-    FAp (finality E-final ctxcons ta-f eval-f) (finality E-final ctxcons ta-arg eval-arg) h2 h3
+  finality E-final ctxcons (TAApp h ta-f ta-arg) (EAppUnfinished eval-f h2 eval-arg) =
+    FAp (finality E-final ctxcons ta-f eval-f) (finality E-final ctxcons ta-arg eval-arg) h2
   finality E-final ctxcons TAUnit EUnit = FUnit
   finality E-final ctxcons (TAPair _ ta1 ta2) (EPair eval1 eval2)
     = FPair (finality E-final ctxcons ta1 eval1) (finality E-final ctxcons ta2 eval2)

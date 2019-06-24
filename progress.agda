@@ -72,7 +72,6 @@ module progress where
 
   progress {n = Z} Γ⊢E ta
     = Inl (_ , _ , ELimit , π2 (typ-inhabitance-pres Γ⊢E ta))
-  progress {n = 1+ n} Γ⊢E ta'@(TALam ta)   = Inl (_ , _ , EFun , TALam Γ⊢E ta')
   progress {n = 1+ n} Γ⊢E ta'@(TAFix ta) = Inl (_ , _ , EFix , TAFix Γ⊢E ta')
   progress {n = 1+ n} Γ⊢E (TAVar x∈Γ)
     with env-all-Γ Γ⊢E x∈Γ
@@ -83,26 +82,22 @@ module progress where
   ... | Inl (rarg , _ , arg-evals , ta-rarg)
     with progress Γ⊢E ta-f
   ... | Inr f-fails = Inr (EFAppFun f-fails)
-  progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl (([ E' ]λ x => ef) , _ , f-evals , TALam Γ'⊢E' (TALam ta-ef))
-    with progress {n = n} (EnvInd Γ'⊢E' ta-rarg) ta-ef
-  ... | Inr ef-fails = Inr (EFAppEval CF⛽ f-evals arg-evals ef-fails)
-  ... | Inl (ref , _ , ef-evals , ta-ref) = Inl (_ , _ , EApp CF⛽ f-evals arg-evals ef-evals , ta-ref)
   progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl ([ E' ]fix f ⦇·λ x => ef ·⦈ , _ , f-evals , ta'@(TAFix Γ'⊢E' (TAFix ta-ef)))
     with progress {n = n} (EnvInd (EnvInd Γ'⊢E' ta') ta-rarg) ta-ef
   ... | Inr ef-fails = Inr (EFAppFixEval CF⛽ refl f-evals arg-evals ef-fails)
   ... | Inl (ref , _ , ef-evals , ta-ref) = Inl (_ , _ , EAppFix CF⛽ refl f-evals arg-evals ef-evals , ta-ref)
   progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl ([ E' ]??[ u ] , _ , f-evals , ta-rf)
-    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) (λ ()) arg-evals , TAApp ta-rf ta-rarg)
+    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) arg-evals , TAApp ta-rf ta-rarg)
   progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl ((rf-f ∘ rf-arg) , _ , f-evals , ta-rf)
-    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) (λ ()) arg-evals , TAApp ta-rf ta-rarg)
+    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) arg-evals , TAApp ta-rf ta-rarg)
   progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl (fst _ , _ , f-evals , ta-rf)
-    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) (λ ()) arg-evals , TAApp ta-rf ta-rarg)
+    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) arg-evals , TAApp ta-rf ta-rarg)
   progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl (snd _ , _ , f-evals , ta-rf)
-    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) (λ ()) arg-evals , TAApp ta-rf ta-rarg)
+    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) arg-evals , TAApp ta-rf ta-rarg)
   progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl ([ E' ]case rf of⦃· rules ·⦄ , _ , f-evals , ta-rf)
-    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) (λ ()) arg-evals , TAApp ta-rf ta-rarg)
+    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) arg-evals , TAApp ta-rf ta-rarg)
   progress {n = 1+ n} Γ⊢E (TAApp _ ta-f ta-arg) | Inl (rarg , _ , arg-evals , ta-rarg) | Inl ((C⁻[ _ ] _) , _ , f-evals , ta-rf)
-    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) (λ ()) arg-evals , TAApp ta-rf ta-rarg)
+    = Inl (_ , _ , EAppUnfinished f-evals (λ ()) arg-evals , TAApp ta-rf ta-rarg)
   progress {n = 1+ n} Γ⊢E TAUnit = Inl (_ , _ , EUnit , TAUnit)
   progress {n = 1+ n} Γ⊢E (TAPair _ ta1 ta2)
     with progress Γ⊢E ta1
@@ -116,7 +111,6 @@ module progress where
   ... | Inr fails = Inr (EFFst fails)
   progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TAFst ta) | Inl (⟨ r1 , r2 ⟩ , _ , evals , TAPair ta-r1 ta-r2)
     = Inl (_ , _ , EFst evals , ta-r1)
-  progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TAFst ta) | Inl (([ x ]λ x₁ => x₂) , _ , evals , TALam _ ())
   progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TAFst ta) | Inl ([ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ , _ , evals , TAFix _ ())
   progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TAFst ta) | Inl ((C⁻[ x ] q) , _ , evals , ta-r)
     = Inl (_ , _ , EFstUnfinished evals (λ ()) , TAFst ta-r)
@@ -135,7 +129,6 @@ module progress where
   ... | Inr fails = Inr (EFSnd fails)
   progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TASnd ta) | Inl (⟨ r1 , r2 ⟩ , _ , evals , TAPair ta-r1 ta-r2)
     = Inl (_ , _ , ESnd evals , ta-r2)
-  progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TASnd ta) | Inl (([ x ]λ x₁ => x₂) , _ , evals , TALam _ ())
   progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TASnd ta) | Inl ([ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ , _ , evals , TAFix _ ())
   progress {Δ} {Σ'} {E = E} {τ = τ} {1+ n} Γ⊢E (TASnd ta) | Inl ((C⁻[ x ] q) , _ , evals , ta-r)
     = Inl (_ , _ , ESndUnfinished evals (λ ()) , TASnd ta-r)
@@ -156,7 +149,6 @@ module progress where
   progress {Σ' = Σ'} {n = 1+ n} Γ⊢E (TACase d∈σ' e-ta cctx⊆rules h-rules)
     with progress Γ⊢E e-ta
   ... | Inr e-fails = Inr (EFMatchScrut e-fails)
-  ... | Inl (([ x ]λ x₁ => x₂) , _ , e-evals , TALam _ ())
   ... | Inl ([ x ]fix x₁ ⦇·λ x₂ => x₃ ·⦈ , _ , e-evals , TAFix _ ())
   ... | Inl ([ x ]??[ x₁ ] , _ , e-evals , ta-re)
           = Inl (_ , _ , EMatchUnfinished e-evals (λ ()) , TACase d∈σ' Γ⊢E ta-re cctx⊆rules (λ form →
@@ -214,8 +206,6 @@ module progress where
                          (∀{c r} → r1 ≠ (C[ c ] r)) →
                          Σ[ k ∈ constraints ] Constraints⦃ r1 , r2 ⦄⌊ ⛽⟨ n ⟩ ⌋:= k
                          ∨ Constraints⦃ r1 , r2 ⦄⌊ ⛽⟨ n ⟩ ⌋:=∅
-  lemma-xc-no-coerce ta1 (TALam x x₁) r1≠r2 no-coerce not-unit not-pair not-ctor
-    = Inr (XCFNoCoerce r1≠r2 (Inl not-pair) (Inl not-ctor) no-coerce λ ())
   lemma-xc-no-coerce ta1 (TAFix x x₁) r1≠r2 no-coerce not-unit not-pair not-ctor
     = Inr (XCFNoCoerce r1≠r2 (Inl not-pair) (Inl not-ctor) no-coerce λ ())
   lemma-xc-no-coerce ta1 (TAApp ta2 ta3) r1≠r2 no-coerce not-unit not-pair not-ctor
@@ -252,8 +242,6 @@ module progress where
   xc-progress {r1 = r1} {r2} ta1 ta2
     with result-==-dec r1 r2
   ... | Inl refl = Inl (_ , XCExRefl)
-  xc-progress {r1 = _} {_} ta1@(TALam x x₁) ta2 | Inr r1≠r2
-    = lemma-xc-no-coerce ta1 ta2 r1≠r2 (λ ()) (λ ()) (λ ()) λ ()
   xc-progress {r1 = _} {_} ta1@(TAFix x x₁) ta2 | Inr r1≠r2
     = lemma-xc-no-coerce ta1 ta2 r1≠r2 (λ ()) (λ ()) (λ ()) λ ()
   xc-progress {r1 = _} {_} ta1@(TAApp _ _) ta2 | Inr r1≠r2
@@ -376,14 +364,6 @@ module progress where
   xb-progress {ex = ex} {n = 1+ n} ta-r ta-ex
     with ex-¿¿-dec {ex}
   ... | Inl refl = Inl (_ , XBNone)
-  xb-progress (TALam Γ⊢E (TALam ta-e)) (TAMap _ ta-v ta-ex) | Inr ne
-    with progress (EnvInd Γ⊢E ta-v) ta-e
-  ... | Inr fails    = Inr (XBFFunEval CF⛽ fails)
-  ... | Inl (_ , _ , evals , ta)
-    with xb-progress ta ta-ex
-  ... | Inr fails    = Inr (XBFFun CF⛽ evals fails)
-  ... | Inl (_ , xb) = Inl (_ , XBFun CF⛽ evals xb)
-  xb-progress (TALam x (TALam _)) TADC | Inr ne = Inl (_ , XBNone)
   xb-progress {n = 1+ n} ta-f@(TAFix Γ⊢E (TAFix ta-e)) (TAMap _ ta-v ta-ex) | Inr ne
     with progress {n = n} (EnvInd (EnvInd Γ⊢E ta-f) ta-v) ta-e
   ... | Inr fails    = Inr (XBFFixEval CF⛽ refl fails)

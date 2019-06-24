@@ -8,7 +8,6 @@ open import core
 module completeness where
   -- any hole is new to a complete expression
   e-complete-hnn : ∀{e u} → e ecomplete → hole-name-new e u
-  e-complete-hnn (ECLam cmp) = HNNLam (e-complete-hnn cmp)
   e-complete-hnn (ECFix cmp) = HNNFix (e-complete-hnn cmp)
   e-complete-hnn ECVar = HNNVar
   e-complete-hnn (ECAp cmp1 cmp2) = HNNAp (e-complete-hnn cmp1) (e-complete-hnn cmp2)
@@ -27,7 +26,6 @@ module completeness where
 
   -- a complete expression is holes-disjoint to all expressions
   e-complete-disjoint : ∀{e1 e2} → e1 ecomplete → holes-disjoint e1 e2
-  e-complete-disjoint (ECLam cmp) = HDLam (e-complete-disjoint cmp)
   e-complete-disjoint (ECFix cmp) = HDFix (e-complete-disjoint cmp)
   e-complete-disjoint ECVar = HDVar
   e-complete-disjoint (ECAp cmp1 cmp2) = HDAp (e-complete-disjoint cmp1) (e-complete-disjoint cmp2)

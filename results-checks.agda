@@ -9,7 +9,6 @@ module results-checks where
   -- all values are final
   mutual
     values-final : ∀{r} → r value → r final
-    values-final (VLam x) = FLam x
     values-final (VFix x) = FFix x
     values-final VUnit = FUnit
     values-final (VPair val val₁) = FPair (values-final val) (values-final val₁)
@@ -19,7 +18,6 @@ module results-checks where
                             Δ , Σ' ⊢ r ·: τ →
                             Coerce r := ex →
                             Δ , Σ' ⊢ ex :· τ
-    Coerce-preservation (TALam x x₁) ()
     Coerce-preservation (TAFix x x₁) ()
     Coerce-preservation (TAApp ta-r ta-r₁) ()
     Coerce-preservation TAUnit CoerceUnit = TAUnit

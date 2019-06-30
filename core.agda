@@ -711,6 +711,55 @@ module core where
                        (∀{c r''} → r' ≠ (C[ c ] r'')) →
                        H ⊢ [ E ]case r of⦃· rules ·⦄ ⇨ [ E ]case r' of⦃· rules ·⦄ := k
 
+  -- type checking for hole fillings
+  data _,_⊢ₕ_ : hctx → denv → hole-fillings → Set where
+    TANil         : ∀{Δ Σ'} → Δ , Σ' ⊢ₕ ∅
+    TAHoleFilling : ∀{Δ Σ' H u e Γ τ} →
+                      (u , Γ , τ) ∈ Δ →
+                      Δ , Σ' ⊢ₕ H →
+                      Δ , Σ' , Γ ⊢ e :: τ →
+                      Δ , Σ' ⊢ₕ (H ,, (u , e))
+
+  -- hole substitution
+  data _[_/??]:=_ : exp → hole-fillings → exp → Set where
+    SHoleFill : ∀{H u e} → (u , e) ∈ H → ??[ u ] [ H /??]:= e
+    SHoleUnf  : ∀{H u}   → u # H       → ??[ u ] [ H /??]:= ??[ u ]
+    SFix      : ∀{H f x e e'} →
+                  e [ H /??]:= e' →
+                  (fix f ⦇·λ x => e ·⦈) [ H /??]:= (fix f ⦇·λ x => e' ·⦈)
+    SVar      : ∀{H x} → X[ x ] [ H /??]:= X[ x ]
+    SApp      : ∀{H ef ef' earg earg'} →
+                  ef [ H /??]:= ef' →
+                  earg [ H /??]:= earg' →
+                  (ef ∘ earg) [ H /??]:= (ef' ∘ earg')
+    SUnit     : ∀{H} → ⟨⟩ [ H /??]:= ⟨⟩
+    SPair     : ∀{H e1 e1' e2 e2'} →
+                  e1 [ H /??]:= e1' →
+                  e2 [ H /??]:= e2' →
+                  ⟨ e1 , e2 ⟩ [ H /??]:= ⟨ e1' , e2' ⟩
+    SFst      : ∀{H e e'} →
+                  e [ H /??]:= e' →
+                  fst e [ H /??]:= fst e'
+    SSnd      : ∀{H e e'} →
+                  e [ H /??]:= e' →
+                  snd e [ H /??]:= snd e'
+    SCtor     : ∀{H c e e'} →
+                  e [ H /??]:= e' →
+                  (C[ c ] e) [ H /??]:= (C[ c ] e')
+    SMatch    : ∀{H e e' rules rules'} →
+                  (∀{c} → dom rules c → dom rules' c) →
+                  (∀{c} → dom rules' c → dom rules c) →
+                  e [ H /??]:= e' →
+                  (∀{c x-c x-c' e-c e-c'} →
+                     (c , |C x-c => e-c) ∈ rules →
+                     (c , |C x-c' => e-c') ∈ rules' →
+                     x-c == x-c' ∧ e-c [ H /??]:= e-c') →
+                  case e of⦃· rules ·⦄ [ H /??]:= case e' of⦃· rules' ·⦄
+    SAsrt     : ∀{H e1 e1' e2 e2'} →
+                  e1 [ H /??]:= e1' →
+                  e2 [ H /??]:= e2' →
+                  PBE:assert e1 e2 [ H /??]:= PBE:assert e1' e2'
+
   -- TODO proof that backprop generalizes satisfaction stuff?
 
   -- TODO theorem that synthesized expressions evaluate completely with no constraints
@@ -844,7 +893,7 @@ module core where
                 Δ , Σ' , Γ ⊢ ⟨ τ1 × τ2 ⟩ ⇝ e := Δ' →
                 Δ , Σ' , Γ ⊢ τ2 ⇝ snd e := Δ'
 
-  -- Example Satisfaction
+  -- Example Satisfaction for results
   data _,_·⊨_ : hole-fillings → result → ex → Set where
     XSUnit  : ∀{H} → H , ⟨⟩ ·⊨ ⟨⟩
     XSPair  : ∀{H r r1 r2 ex1 ex2} →
@@ -863,13 +912,22 @@ module core where
                 H , r1 ·⊨ (r2 ↦ ex)
     XSNone  : ∀{H r} → H , r ·⊨ ¿¿
 
-  -- Constraint Satisfaction
+  -- Constraint Satisfaction for results
   data _⊨_ : hole-fillings → constraints → Set where
     CSEmpty      : ∀{H} → H ⊨ []
     CSConstraint : ∀{H k r ex} →
                      H ⊨ k →
                      H , r ·⊨ ex →
                      H ⊨ ((r , ex) :: k)
+
+  -- Constraint satisfaction for exps
+  data _,_:⊨_ : hole-fillings → exp → worlds → Set where
+    CSEmpty      : ∀{H e} → H , e :⊨ []
+    CSConstraint : ∀{H e E ex W r} →
+                     H , e :⊨ W →
+                     E ⊢ e ⇒ r ⊣ [] →
+                     H , r ·⊨ ex →
+                     H , e :⊨ ((E , ex) :: W)
 
   Split : constraints → List (Nat ∧ world) ∧ constraints
   Split [] = ([] , [])

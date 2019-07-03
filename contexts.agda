@@ -49,6 +49,9 @@ module contexts where
   _#_ : {A : Set} (n : Nat) → (Γ : A ctx) → Set
   x # Γ = dom Γ x → ⊥
 
+  _##_ : {A : Set} → A ctx → A ctx → Set
+  Γ1 ## Γ2 = (x : Nat) → dom Γ1 x → x # Γ2
+
   -- TODO theorems and explanation
   ctxmap : {A B : Set} → (A → B) → A ctx → B ctx
   ctxmap f Γ = map (λ {(hx , ha) → (hx , f ha)}) Γ
@@ -64,6 +67,8 @@ module contexts where
   -- a ∪ b is the union of a and b, with mappings in b overriding those in a
   _∪_ : {A : Set} → A ctx → A ctx → A ctx
 
+  infixl 50 _∪_
+
   -- The primary way to test membership is to use _∈_,
   -- but this can be used in cases where using _∈_
   -- would be too verbose or awkward.
@@ -74,6 +79,16 @@ module contexts where
   ... | Inl x<hx       = None
   ... | Inr (Inl refl) = Some ha
   ... | Inr (Inr hx<x) = t ⦃⦃ diff-1 hx<x ⦄⦄
+
+  ---- some definitions ----
+
+  -- TODO maybe define ctx⇒list then refactor this
+  union' : {A : Set} → A ctx → A ctx → Nat → A ctx
+  union' Γ1 [] _ = Γ1
+  union' Γ1 ((hx , ha) :: Γ2) offset
+    = union' (Γ1 ,, (hx + offset , ha)) Γ2 (offset + 1+ hx)
+
+  Γ1 ∪ Γ2 = union' Γ1 Γ2 0
 
   ---- lemmas ----
 
@@ -501,11 +516,3 @@ module contexts where
           = l-ctx ,, (n , a :: [])
 
   ctx⇒values = map π2
-
-  -- TODO maybe define ctx⇒list then refactor this
-  union' : {A : Set} → A ctx → A ctx → Nat → A ctx
-  union' Γ1 [] _ = Γ1
-  union' Γ1 ((hx , ha) :: Γ2) offset
-    = union' (Γ1 ,, (hx + offset , ha)) Γ2 (offset + 1+ hx)
-
-  Γ1 ∪ Γ2 = union' Γ1 Γ2 0

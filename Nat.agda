@@ -217,9 +217,9 @@ module Nat where
   m-n+n==m ≤refl = refl
   m-n+n==m (≤1+ n≤m) = 1+ap (m-n+n==m n≤m)
 
-  n+m-n==m : ∀{n m} → difference (n≤n+m {n} {m}) == m
-  n+m-n==m {n} {m} =
-    n+a==m+a→n==m (m-n+n==m {n} n≤n+m · +comm {n})
+  n+m-n==m : ∀{n m} → (n≤n+m : n ≤ n + m) → difference n≤n+m == m
+  n+m-n==m {n} n≤n+m =
+    n+a==m+a→n==m (m-n+n==m n≤n+m · +comm {n})
 
   diff-proof-irrelevance : ∀{n m} →
                              (n≤m1 n≤m2 : n ≤ m) →

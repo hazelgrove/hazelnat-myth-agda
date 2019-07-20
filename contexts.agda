@@ -95,7 +95,7 @@ module contexts where
   undiff-1 : (x s : Nat) → (x<s+1+x : x < s + 1+ x) → s == diff-1 x<s+1+x
   undiff-1 x s x<s+1+x
     rewrite n+1+m==1+n+m {s} {x} | ! (m-n==1+m-1+n n≤m+n (n<m→1+n≤m x<s+1+x)) | +comm {s} {x}
-      = ! (n+m-n==m {x} {s})
+      = ! (n+m-n==m n≤n+m)
 
   too-small : {A : Set} {Γ : A ctx} {xl xb : Nat} {a : A} →
                xl < xb →

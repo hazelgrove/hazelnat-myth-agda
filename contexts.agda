@@ -60,10 +60,12 @@ module contexts where
   -- returns a list of the values stored in the context
   ctx⇒values : {A : Set} → A ctx → List A
 
-  -- TODO theorems and explanation
-  list⇒ctx : {A : Set} → List (Nat ∧ A) → (List A) ctx
-
   -- TODO theorems
+  -- converts a list of key-value pairs into a multi-context, where each value of
+  -- the result is the sublist of values from the former that were mapped to by the
+  -- corresponding key
+  list⇒list-ctx : {A : Set} → List (Nat ∧ A) → (List A) ctx
+
   -- a ∪ b is the union of a and b, with mappings in b overriding those in a
   _∪_ : {A : Set} → A ctx → A ctx → A ctx
 
@@ -504,15 +506,15 @@ module contexts where
 
   ---- remaining function definitions ----
 
-  -- TODO redefine using foldl
-  list⇒ctx [] = ∅
-  list⇒ctx ((n , a) :: l)
-    with list⇒ctx l
-  ... | l-ctx
-    with ctxindirect l-ctx n
-  ... | Inl (as , n∈l-ctx)
-          = l-ctx ,, (n , a :: as)
-  ... | Inr n#rest-ctx
-          = l-ctx ,, (n , a :: [])
+  list⇒list-ctx {A} l
+    = foldl f ∅ (reverse l)
+      where
+        f : (List A) ctx → Nat ∧ A → (List A) ctx
+        f Γ (n , a)
+          with ctxindirect Γ n
+        ... | Inl (as , n∈Γ)
+          = Γ ,, (n , a :: as)
+        ... | Inr n#Γ
+          = Γ ,, (n , a :: [])
 
   ctx⇒values = map π2

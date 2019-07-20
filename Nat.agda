@@ -221,6 +221,10 @@ module Nat where
   n+m-n==m {n} n≤n+m =
     n+a==m+a→n==m (m-n+n==m n≤n+m · +comm {n})
 
+  a+b==c→a==c-b : ∀{a b c} → a + b == c → (b≤c : b ≤ c) → a == difference b≤c
+  a+b==c→a==c-b a+b==c b≤c
+    = n+a==m+a→n==m (a+b==c · ! (m-n+n==m b≤c))
+
   diff-proof-irrelevance : ∀{n m} →
                              (n≤m1 n≤m2 : n ≤ m) →
                              difference n≤m1 == difference n≤m2

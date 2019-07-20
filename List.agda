@@ -50,6 +50,10 @@ module List where
     with unzip rest
   ... | (as , bs) = (a :: as , b :: bs)
 
+  reverse : {A : Set} → List A → List A
+  reverse [] = []
+  reverse (a :: as) = reverse as ++ (a :: [])
+
   -- theorems
 
   list-==-dec :  {A : Set} →
@@ -78,11 +82,18 @@ module List where
     rewrite someinj (items== Z) | ==-per-elem {l1 = t1} {t2} (λ i → items== (1+ i))
       = refl
 
-  -- _++_ theorem
+  -- _++_ theorems
   ++assc : ∀{A a1 a2 a3} → (_++_ {A} a1 a2) ++ a3 == a1 ++ (a2 ++ a3)
   ++assc {A} {[]} {a2} {a3} = refl
   ++assc {A} {x :: a1} {a2} {a3} with a1 ++ a2 ++ a3 | ++assc {A} {a1} {a2} {a3}
   ++assc {A} {x :: a1} {a2} {a3} | _ | refl = refl
+
+  l++[]==l : {A : Set} (l : List A) →
+              l ++ [] == l
+  l++[]==l [] = refl
+  l++[]==l (a :: as)
+    rewrite l++[]==l as
+      = refl
 
   -- ∥_∥ theorem
   ∥-++-comm : ∀{A a1 a2} → ∥ a1 ∥ + (∥_∥ {A} a2) == ∥ a1 ++ a2 ∥
@@ -186,3 +197,22 @@ module List where
   zip-inv {la = a :: as} {b :: bs} len-eq
     with unzip (zip as bs) | zip-inv (1+inj len-eq)
   ...  | (as' , bs')       | refl                   = refl
+
+  -- reverse theorems
+  reverse-single : {A : Set} {a : A} → reverse (a :: []) == a :: []
+  reverse-single = refl
+
+  reverse-++ : {A : Set} {l1 l2 : List A} →
+                reverse (l1 ++ l2) == reverse l2 ++ reverse l1
+  reverse-++ {l1 = []} {l2}
+    rewrite l++[]==l (reverse l2)
+      = refl
+  reverse-++ {l1 = a1 :: as1} {l2}
+    rewrite reverse-++ {l1 = as1} {l2}
+      = ++assc {a1 = reverse l2}
+
+  reverse-inv : {A : Set} {l : List A} → reverse (reverse l) == l
+  reverse-inv {l = []} = refl
+  reverse-inv {l = a :: as}
+    rewrite reverse-++ {l1 = reverse as} {a :: []} | reverse-inv {l = as}
+      = refl

@@ -812,8 +812,7 @@ module core where
 
   -- Example Satisfaction for results
   data _,_·⊨_ : hole-fillings → result → ex → Set where
-    XSNone  : ∀{H r} → -- r'} →
-                -- TODO H ⊢ r ⇨ r' := [] →
+    XSNone  : ∀{H r} →
                 H , r ·⊨ ¿¿
     XSUnit  : ∀{H} → H , ⟨⟩ ·⊨ ⟨⟩
     XSPair  : ∀{H r1 r2 ex1 ex2} →
@@ -823,31 +822,11 @@ module core where
     XSCtor  : ∀{H r c ex} →
                 H , r ·⊨ ex →
                 H , C[ c ] r ·⊨ (C[ c ] ex)
-    XSInOut2 : ∀{H r1 v2 ex r ex2} →
+    XSInOut : ∀{H r1 v2 ex r ex2} →
                  Coerce v2 := ex2 →
                  H ⊢ r1 ∘ v2 ⇨ r →
                  H , r ·⊨ ex →
                  H , r1 ·⊨ (v2 ↦ ex)
-                {- TODO uncomment}
-    XSInOut : ∀{H E f x e varg exarg earg ex r} →
-                -- rf == [ E ]fix f ⦇·λ x => e ·⦈ →
-                -- (E ,, (f , rf) ,, (x , rarg)) ⊢ e ⇒ r ⊣ [] →
-                Coerce varg := exarg →
-                Lift exarg := earg →
-                E ⊢ fix f ⦇·λ x => e ·⦈ ∘ earg ⇒ r ⊣ [] →
-                H , r ·⊨ ex →
-                H , [ E ]fix f ⦇·λ x => e ·⦈ ·⊨ (varg ↦ ex)
-    XSIndet : ∀{H r ex r'} →
-                ex ≠ ¿¿ →
-                r ≠ ⟨⟩ →
-                (∀{c r''} → r ≠ (C[ c ] r'')) →
-                (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
-                (∀{E f x e} → r ≠ [ E ]fix f ⦇·λ x => e ·⦈) →
-                r ≠ r' →
-                H ⊢ r ⇨ r' →
-                H , r' ·⊨ ex →
-                H , r ·⊨ ex
-                -}
 
   -- Constraint Satisfaction for results
   data _⊨_ : hole-fillings → constraints → Set where

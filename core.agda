@@ -303,6 +303,16 @@ module core where
                    Coerce r := ex →
                    Coerce C[ c ] r := C[ c ] ex
 
+  data Lift_:=_ : ex → exp → Set where
+    LiftUnit : Lift ⟨⟩ := ⟨⟩
+    LiftPair : ∀{e1 e2 ex1 ex2} →
+                 Lift ex1 := e1 →
+                 Lift ex2 := e2 →
+                 Lift ⟨ ex1 , ex2 ⟩ := ⟨ e1 , e2 ⟩
+    LiftCtor : ∀{c ex e} →
+                 Lift ex := e →
+                 Lift C[ c ] ex := C[ c ] e
+
   not-both-pair : (r r' : result) → Set
   not-both-pair r r' = (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩)  ∨ (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩)
   not-both-ctor : (r r' : result) → Set
@@ -371,16 +381,17 @@ module core where
       XBHole       : ∀{⛽ E u ex} →
                        ex ≠ ¿¿ →
                        [ E ]??[ u ] ⇐ ex ⌊ ⛽ ⌋:= ((u , E , ex) :: [])
-      XBApp        : ∀{⛽ r1 r2 ex k} →
+      XBApp        : ∀{⛽ r1 r2 ex ex' k} →
                        ex ≠ ¿¿ →
+                       Coerce r2 := ex' →
                        r1 ⇐ r2 ↦ ex ⌊ ⛽ ⌋:= k →
                        (r1 ∘ r2) ⇐ ex ⌊ ⛽ ⌋:= k
-      XBFix        : ∀{⛽ ⛽↓ E f x e rf rarg ex r' k1 k2} →
+      XBFix        : ∀{⛽ ⛽↓ E f x e rf rarg ex r' k} →
                        ⛽ ⛽⇓ ⛽↓ →
                        rf == [ E ]fix f ⦇·λ x => e ·⦈ →
-                       (E ,, (f , rf) ,, (x , rarg)) ⊢ e ⌊ ⛽↓ ⌋⇒ r' ⊣ k1 →
-                       r' ⇐ ex ⌊ ⛽↓ ⌋:= k2 →
-                       rf ⇐ rarg ↦ ex ⌊ ⛽ ⌋:= k1 ++ k2
+                       (E ,, (f , rf) ,, (x , rarg)) ⊢ e ⌊ ⛽↓ ⌋⇒ r' ⊣ [] →
+                       r' ⇐ ex ⌊ ⛽↓ ⌋:= k →
+                       rf ⇐ rarg ↦ ex ⌊ ⛽ ⌋:= k
       XBFst        : ∀{⛽ r ex1 k} →
                        ex1 ≠ ¿¿ →
                        r ⇐ ⟨ ex1 , ¿¿ ⟩ ⌊ ⛽ ⌋:= k →
@@ -389,14 +400,14 @@ module core where
                        ex2 ≠ ¿¿ →
                        r ⇐ ⟨ ¿¿ , ex2 ⟩ ⌊ ⛽ ⌋:= k →
                        snd r ⇐ ex2 ⌊ ⛽ ⌋:= k
-      XBMatch      : ∀{⛽ ⛽↓ E r rules ex c-j x-j e-j r-j k1 k2 k3} →
+      XBMatch      : ∀{⛽ ⛽↓ E r rules ex c-j x-j e-j r-j k1 k2} →
                        ⛽ ⛽⇓ ⛽↓ →
                        ex ≠ ¿¿ →
                        (c-j , |C x-j => e-j) ∈ rules →
                        r ⇐ C[ c-j ] ¿¿ ⌊ ⛽ ⌋:= k1 →
-                       (E ,, (x-j , C⁻[ c-j ] r)) ⊢ e-j ⌊ ⛽↓ ⌋⇒ r-j ⊣ k2 →
-                       r-j ⇐ ex ⌊ ⛽↓ ⌋:= k3 →
-                       [ E ]case r of⦃· rules ·⦄ ⇐ ex ⌊ ⛽ ⌋:= k1 ++ k2 ++ k3
+                       (E ,, (x-j , C⁻[ c-j ] r)) ⊢ e-j ⌊ ⛽↓ ⌋⇒ r-j ⊣ [] →
+                       r-j ⇐ ex ⌊ ⛽↓ ⌋:= k2 →
+                       [ E ]case r of⦃· rules ·⦄ ⇐ ex ⌊ ⛽ ⌋:= k1 ++ k2
       XBUnwrapCtor : ∀{⛽ c r ex k} →
                        ex ≠ ¿¿ →
                        r ⇐ C[ c ] ex ⌊ ⛽ ⌋:= k →
@@ -648,76 +659,88 @@ module core where
   hole-fillings = exp ctx
 
   -- resumption
-  data _⊢_⇨_:=_ : hole-fillings → result → result → constraints → Set where
-    RFix           : ∀{H E f x e r} →
-                       r == [ E ]fix f ⦇·λ x => e ·⦈ →
-                       H ⊢ r ⇨ r := []
-    RHoleFill      : ∀{H E u r e k} →
-                       (u , e) ∈ H →
-                       E ⊢ e ⇒ r ⊣ k →
-                       H ⊢ [ E ]??[ u ] ⇨ r := k
-    RHoleUnf       : ∀{H E u} →
-                       u # H →
-                       H ⊢ [ E ]??[ u ] ⇨ [ E ]??[ u ] := []
-    RUnit          : ∀{H} → H ⊢ ⟨⟩ ⇨ ⟨⟩ := []
-    RPair          : ∀{H r1 r2 r1' r2' k1 k2} →
-                       H ⊢ r1 ⇨ r1' := k1 →
-                       H ⊢ r2 ⇨ r2' := k2 →
-                       H ⊢ ⟨ r1 , r2 ⟩ ⇨ ⟨ r1' , r2' ⟩ := k1 ++ k2
-    RCtor          : ∀{H c r r' k} →
-                       H ⊢ r ⇨ r' := k →
-                       H ⊢ C[ c ] r ⇨ C[ c ] r' := k
-    RUnwrapCtor    : ∀{H c r rc rc' k k'} →
-                       H ⊢ r ⇨ C[ c ] rc := k →
-                       H ⊢ rc ⇨ rc' := k' →
-                       H ⊢ C⁻[ c ] r ⇨ rc' := k ++ k'
-    RUnwrapCtorUnf : ∀{H c r r' k} →
-                       H ⊢ r ⇨ r' := k →
-                       (∀{c r''} → r' ≠ (C[ c ] r'')) →
-                       H ⊢ C⁻[ c ] r ⇨ C⁻[ c ] r' := k
-    RApp           : ∀{H rf rarg r' Ef f x ef rf' rarg' kf karg kef} →
-                       H ⊢ rf ⇨ rf' := kf →
-                       rf' == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                       H ⊢ rarg ⇨ rarg' := karg →
-                       (Ef ,, (f , rf) ,, (x , rarg)) ⊢ ef ⇒ r' ⊣ kef →
-                       H ⊢ rf ∘ rarg ⇨ r' := kf ++ karg ++ kef
-    RAppUnf        : ∀{H rf rarg rf' rarg' kf karg} →
-                       H ⊢ rf ⇨ rf' := kf →
-                       (∀{E f x e} → rf' ≠ [ E ]fix f ⦇·λ x => e ·⦈) →
-                       H ⊢ rarg ⇨ rarg' := karg →
-                       H ⊢ rf ∘ rarg ⇨ rf' ∘ rarg' := kf ++ karg
-    RFst           : ∀{H r r1 r2 k} →
-                       H ⊢ r ⇨ ⟨ r1 , r2 ⟩ := k →
-                       H ⊢ fst r ⇨ r1 := k
-    RFstUnf        : ∀{H r r' k} →
-                       H ⊢ r ⇨ r' := k →
-                       (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩) →
-                       H ⊢ fst r ⇨ fst r' := k
-    RSnd           : ∀{H r r1 r2 k} →
-                       H ⊢ r ⇨ ⟨ r1 , r2 ⟩ := k →
-                       H ⊢ snd r ⇨ r2 := k
-    RSndUnf        : ∀{H r r' k} →
-                       H ⊢ r ⇨ r' := k →
-                       (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩) →
-                       H ⊢ snd r ⇨ snd r' := k
-    RMatch         : ∀{H E r rules c xc ec r' rc kc k} →
-                       (c , |C xc => ec) ∈ rules →
-                       H ⊢ r ⇨ (C[ c ] r') := kc →
-                       (E ,, (xc , r')) ⊢ ec ⇒ rc ⊣ k →
-                       H ⊢ [ E ]case r of⦃· rules ·⦄ ⇨ rc := kc ++ k
-    RMatchUnf      : ∀{H E r rules r' k} →
-                       H ⊢ r ⇨ r' := k →
-                       (∀{c r''} → r' ≠ (C[ c ] r'')) →
-                       H ⊢ [ E ]case r of⦃· rules ·⦄ ⇨ [ E ]case r' of⦃· rules ·⦄ := k
+  mutual
+    data _⊢_:⇨_ : hole-fillings → env → env → Set where
+      RENil : ∀{F} → F ⊢ ∅ :⇨ ∅
+      REInd : ∀{F E E' x r r'} →
+                F ⊢ E :⇨ E' →
+                F ⊢ r ⇨ r' →
+                F ⊢ E ,, (x , r) :⇨ (E' ,, (x , r'))
+
+    data _⊢_⇨_ : hole-fillings → result → result → Set where
+      RFix           : ∀{H E E' f x e} →
+                         H ⊢ E :⇨ E' →
+                         H ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ⇨ [ E' ]fix f ⦇·λ x => e ·⦈
+      RHoleFill      : ∀{H E u r r' e} →
+                         (u , e) ∈ H →
+                         E ⊢ e ⇒ r ⊣ [] →
+                         H ⊢ r ⇨ r' →
+                         H ⊢ [ E ]??[ u ] ⇨ r'
+      RHoleUnf       : ∀{H E E' u} →
+                         u # H →
+                         H ⊢ E :⇨ E' →
+                         H ⊢ [ E ]??[ u ] ⇨ [ E' ]??[ u ]
+      RUnit          : ∀{H} → H ⊢ ⟨⟩ ⇨ ⟨⟩
+      RPair          : ∀{H r1 r2 r1' r2'} →
+                         H ⊢ r1 ⇨ r1' →
+                         H ⊢ r2 ⇨ r2' →
+                         H ⊢ ⟨ r1 , r2 ⟩ ⇨ ⟨ r1' , r2' ⟩
+      RCtor          : ∀{H c r r'} →
+                         H ⊢ r ⇨ r' →
+                         H ⊢ C[ c ] r ⇨ (C[ c ] r')
+      RUnwrapCtor    : ∀{H c r rc rc'} →
+                         H ⊢ r ⇨ (C[ c ] rc) →
+                         H ⊢ rc ⇨ rc' →
+                         H ⊢ C⁻[ c ] r ⇨ rc'
+      RUnwrapCtorUnf : ∀{H c r r'} →
+                         H ⊢ r ⇨ r' →
+                         (∀{c r''} → r' ≠ (C[ c ] r'')) →
+                         H ⊢ C⁻[ c ] r ⇨ (C⁻[ c ] r')
+      RApp           : ∀{H rf rarg r r' Ef f x ef rf' rarg'} →
+                         H ⊢ rf ⇨ rf' →
+                         rf' == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                         H ⊢ rarg ⇨ rarg' →
+                         (Ef ,, (f , rf) ,, (x , rarg)) ⊢ ef ⇒ r ⊣ [] →
+                         H ⊢ r ⇨ r' →
+                         H ⊢ rf ∘ rarg ⇨ r'
+      RAppUnf        : ∀{H rf rarg rf' rarg'} →
+                         H ⊢ rf ⇨ rf' →
+                         (∀{E f x e} → rf' ≠ [ E ]fix f ⦇·λ x => e ·⦈) →
+                         H ⊢ rarg ⇨ rarg' →
+                         H ⊢ rf ∘ rarg ⇨ (rf' ∘ rarg')
+      RFst           : ∀{H r r1 r2} →
+                         H ⊢ r ⇨ ⟨ r1 , r2 ⟩ →
+                         H ⊢ fst r ⇨ r1
+      RFstUnf        : ∀{H r r'} →
+                         H ⊢ r ⇨ r' →
+                         (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩) →
+                         H ⊢ fst r ⇨ fst r'
+      RSnd           : ∀{H r r1 r2} →
+                         H ⊢ r ⇨ ⟨ r1 , r2 ⟩ →
+                         H ⊢ snd r ⇨ r2
+      RSndUnf        : ∀{H r r'} →
+                         H ⊢ r ⇨ r' →
+                         (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩) →
+                         H ⊢ snd r ⇨ snd r'
+      RMatch         : ∀{H E r rules c xc ec r' rc rc'} →
+                         (c , |C xc => ec) ∈ rules →
+                         H ⊢ r ⇨ (C[ c ] r') →
+                         (E ,, (xc , r')) ⊢ ec ⇒ rc ⊣ [] →
+                         H ⊢ rc ⇨ rc' →
+                         H ⊢ [ E ]case r of⦃· rules ·⦄ ⇨ rc'
+      RMatchUnf      : ∀{H E E' r rules r'} →
+                         H ⊢ r ⇨ r' →
+                         (∀{c r''} → r' ≠ (C[ c ] r'')) →
+                         H ⊢ E :⇨ E' →
+                         H ⊢ [ E ]case r of⦃· rules ·⦄ ⇨ [ E' ]case r' of⦃· rules ·⦄
 
   -- type checking for hole fillings
   data _,_⊢ₕ_ : hctx → denv → hole-fillings → Set where
-    TANil         : ∀{Δ Σ'} → Δ , Σ' ⊢ₕ ∅
-    TAHoleFilling : ∀{Δ Σ' H u e Γ τ} →
-                      (u , Γ , τ) ∈ Δ →
-                      Δ , Σ' ⊢ₕ H →
-                      Δ , Σ' , Γ ⊢ e :: τ →
-                      Δ , Σ' ⊢ₕ (H ,, (u , e))
+    TANil      : ∀{Σ'} → ∅ , Σ' ⊢ₕ ∅
+    TAHoleFill : ∀{Δ Σ' H u e Γ τ} →
+                   Δ , Σ' ⊢ₕ H →
+                   Δ , Σ' , Γ ⊢ e :: τ →
+                   (Δ ,, (u , Γ , τ)) , Σ' ⊢ₕ (H ,, (u , e))
 
   -- hole substitution
   data _[_/??]:=_ : exp → hole-fillings → exp → Set where
@@ -762,7 +785,7 @@ module core where
   -- TODO proof that backprop generalizes satisfaction stuff?
 
   Group : constraints → worlds ctx
-  Group = list⇒ctx
+  Group = list⇒list-ctx
 
   -- TODO change :=> back to := after we come up with a new symbol for constraints
   data Filter_:=>_ : worlds → worlds → Set where
@@ -789,23 +812,42 @@ module core where
 
   -- Example Satisfaction for results
   data _,_·⊨_ : hole-fillings → result → ex → Set where
-    XSUnit  : ∀{H r} →
-                H ⊢ r ⇨ ⟨⟩ := [] →
-                H , r ·⊨ ⟨⟩
-    XSNone  : ∀{H r} → H , r ·⊨ ¿¿
-    XSPair  : ∀{H r r1 r2 ex1 ex2} →
-                H ⊢ r ⇨ ⟨ r1 , r2 ⟩ := [] →
+    XSNone  : ∀{H r} → -- r'} →
+                -- TODO H ⊢ r ⇨ r' := [] →
+                H , r ·⊨ ¿¿
+    XSUnit  : ∀{H} → H , ⟨⟩ ·⊨ ⟨⟩
+    XSPair  : ∀{H r1 r2 ex1 ex2} →
                 H , r1 ·⊨ ex1 →
                 H , r2 ·⊨ ex2 →
-                H , r ·⊨ ⟨ ex1 , ex2 ⟩
-    XSCtor  : ∀{H r r' c ex} →
-                H ⊢ r ⇨ C[ c ] r' := [] →
-                H , r' ·⊨ ex →
-                H , r ·⊨ (C[ c ] ex)
-    XSInOut : ∀{H r1 r2 r ex} →
-                H ⊢ r1 ∘ r2 ⇨ r := [] →
+                H , ⟨ r1 , r2 ⟩ ·⊨ ⟨ ex1 , ex2 ⟩
+    XSCtor  : ∀{H r c ex} →
                 H , r ·⊨ ex →
-                H , r1 ·⊨ (r2 ↦ ex)
+                H , C[ c ] r ·⊨ (C[ c ] ex)
+    XSInOut2 : ∀{H r1 v2 ex r ex2} →
+                 Coerce v2 := ex2 →
+                 H ⊢ r1 ∘ v2 ⇨ r →
+                 H , r ·⊨ ex →
+                 H , r1 ·⊨ (v2 ↦ ex)
+                {- TODO uncomment}
+    XSInOut : ∀{H E f x e varg exarg earg ex r} →
+                -- rf == [ E ]fix f ⦇·λ x => e ·⦈ →
+                -- (E ,, (f , rf) ,, (x , rarg)) ⊢ e ⇒ r ⊣ [] →
+                Coerce varg := exarg →
+                Lift exarg := earg →
+                E ⊢ fix f ⦇·λ x => e ·⦈ ∘ earg ⇒ r ⊣ [] →
+                H , r ·⊨ ex →
+                H , [ E ]fix f ⦇·λ x => e ·⦈ ·⊨ (varg ↦ ex)
+    XSIndet : ∀{H r ex r'} →
+                ex ≠ ¿¿ →
+                r ≠ ⟨⟩ →
+                (∀{c r''} → r ≠ (C[ c ] r'')) →
+                (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
+                (∀{E f x e} → r ≠ [ E ]fix f ⦇·λ x => e ·⦈) →
+                r ≠ r' →
+                H ⊢ r ⇨ r' →
+                H , r' ·⊨ ex →
+                H , r ·⊨ ex
+                -}
 
   -- Constraint Satisfaction for results
   data _⊨_ : hole-fillings → constraints → Set where
@@ -882,7 +924,7 @@ module core where
                   Wf-ctx ==
                     (ctxmap (λ _ → []) cctx)
                       ∪
-                    (list⇒ctx (map (λ {((E , ex) , c , r) → c , (E ,, (x , r)) , ex}) (zip Wf Wf-evald))) →
+                    (list⇒list-ctx (map (λ {((E , ex) , c , r) → c , (E ,, (x , r)) , ex}) (zip Wf Wf-evald))) →
                   -- Each rule's branch expression must synthesize under the aforementioned
                   -- extended worlds.
                   (∀{c xc ec τc Wc kc Δc} →

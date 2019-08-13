@@ -61,6 +61,11 @@ module contexts where
   ctx⇒values : {A : Set} → A ctx → List A
 
   -- TODO theorems
+  -- converts a list of key-value pairs into a context, with later pairs in the list
+  -- overriding bindings definend by previous pairs
+  list⇒ctx : {A : Set} → List (Nat ∧ A) → A ctx
+
+  -- TODO theorems
   -- converts a list of key-value pairs into a multi-context, where each value of
   -- the result is the sublist of values from the former that were mapped to by the
   -- corresponding key
@@ -597,6 +602,8 @@ module contexts where
           rewrite lookup-cp-1 x#Γ++1 | lookup-cp-1 x#Γ++2 = refl
 
   ---- remaining function definitions ----
+
+  list⇒ctx = foldl _,,_ ∅
 
   list⇒list-ctx {A} l
     = foldl f ∅ (reverse l)

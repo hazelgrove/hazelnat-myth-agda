@@ -689,9 +689,13 @@ module core where
                      H , e ⌊ ⛽ ⌋⊨ᴱ ((E , ex) :: W)
 
   _⌊_⌋⊨_ : hole-fillings → Fuel → constraints → Set
-  H ⌊ ⛽ ⌋⊨ (_ , U) = (u : Nat) (W : worlds) →
-                      (u , W) ∈ U →
-                      H , ??[ u ] ⌊ ⛽ ⌋⊨ᴱ W
+  H ⌊ ⛽ ⌋⊨ (F , U) =
+    (∀{u W} →
+       (u , W) ∈ U →
+       H , ??[ u ] ⌊ ⛽ ⌋⊨ᴱ W) ∧
+    (∀{u e} →
+       (u , e) ∈ F →
+       (u , e) ∈ H)
 
   mutual
     -- example unevaluation

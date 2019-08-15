@@ -343,11 +343,12 @@ module core where
 
   -- type checking for hole fillings
   data _,_⊢ₕ_ : hctx → denv → hole-fillings → Set where
-    TANil      : ∀{Σ'} → ∅ , Σ' ⊢ₕ ∅
+    TANil      : ∀{Δ Σ'} → Δ , Σ' ⊢ₕ ∅
     TAHoleFill : ∀{Δ Σ' H u e Γ τ} →
                    Δ , Σ' ⊢ₕ H →
+                   (u , Γ , τ) ∈ Δ →
                    Δ , Σ' , Γ ⊢ e :: τ →
-                   (Δ ,, (u , Γ , τ)) , Σ' ⊢ₕ (H ,, (u , e))
+                   Δ , Σ' ⊢ₕ (H ,, (u , e))
 
   -- constraints merge
   data _⊕_:=_ : constraints → constraints → constraints → Set where

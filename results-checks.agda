@@ -6,30 +6,21 @@ open import contexts
 open import core
 
 module results-checks where
-  -- all values are final
-  mutual
-    values-final : ∀{r} → r value → r final
-    values-final (VFix x) = FFix x
-    values-final VUnit = FUnit
-    values-final (VPair val val₁) = FPair (values-final val) (values-final val₁)
-    values-final (VCon val) = FCon (values-final val)
-
-    Coerce-preservation : ∀{Δ Σ' r ex τ} →
-                            Δ , Σ' ⊢ r ·: τ →
-                            Coerce r := ex →
-                            Δ , Σ' ⊢ ex :· τ
-    Coerce-preservation (TAFix x x₁) ()
-    Coerce-preservation (TAApp ta-r ta-r₁) ()
-    Coerce-preservation TAUnit CoerceUnit = TAUnit
-    Coerce-preservation (TAPair ta-r1 ta-r2) (CoercePair c-r1 c-r2)
-      = TAPair (Coerce-preservation ta-r1 c-r1) (Coerce-preservation ta-r2 c-r2)
-    Coerce-preservation (TAFst ta-r) ()
-    Coerce-preservation (TASnd ta-r) ()
-    Coerce-preservation (TACtor h1 h2 ta-r) (CoerceCtor c-r)
-      = TACtor h1 h2 (Coerce-preservation ta-r c-r)
-    Coerce-preservation (TAUnwrapCtor x x₁ ta-r) ()
-    Coerce-preservation (TACase x x₁ ta-r x₂ x₃) ()
-    Coerce-preservation (TAHole x x₁) ()
+  Coerce-preservation : ∀{Δ Σ' r v τ} →
+                          Δ , Σ' ⊢ r ·: τ →
+                          Coerce r := v →
+                          Σ' ⊢ v ::ⱽ τ
+  Coerce-preservation (TAFix x x₁) ()
+  Coerce-preservation (TAApp ta-r ta-r₁) ()
+  Coerce-preservation TAUnit CoerceUnit = TSVUnit
+  Coerce-preservation (TAPair ta-r1 ta-r2) (CoercePair c-r1 c-r2)
+    = TSVPair (Coerce-preservation ta-r1 c-r1) (Coerce-preservation ta-r2 c-r2)
+  Coerce-preservation (TAFst ta-r) ()
+  Coerce-preservation (TASnd ta-r) ()
+  Coerce-preservation (TACtor h1 h2 ta-r) (CoerceCtor c-r)
+    = TSVCtor h1 h2 (Coerce-preservation ta-r c-r)
+  Coerce-preservation (TACase x x₁ ta-r x₂ x₃) ()
+  Coerce-preservation (TAHole x x₁) ()
 
   {- TODO : We should revive this - it's a good sanity check.
             Of course, we have to decide what version of "complete" we want to use

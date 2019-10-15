@@ -52,6 +52,11 @@ module contexts where
   _##_ : {A : Set} → A ctx → A ctx → Set
   Γ1 ## Γ2 = (x : Nat) → dom Γ1 x → x # Γ2
 
+  _≈_ : {A : Set} → A ctx → A ctx → Set
+  _≈_ {A} Γ1 Γ2 = (x : Nat) (a1 a2 : A) →
+                   (x , a1) ∈ Γ1 ∧ (x , a2) ∈ Γ2 →
+                   a1 == a2
+
   -- TODO theorems and explanation
   ctxmap : {A B : Set} → (A → B) → A ctx → B ctx
   ctxmap f Γ = map (λ {(hx , ha) → (hx , f ha)}) Γ
@@ -71,10 +76,9 @@ module contexts where
   -- corresponding key
   list⇒list-ctx : {A : Set} → List (Nat ∧ A) → (List A) ctx
 
-  -- a ∪ b is the union of a and b, with mappings in b overriding those in a
-  _∪_ : {A : Set} → A ctx → A ctx → A ctx
-
-  infixl 50 _∪_
+  -- union merge A B is the union of A and B,
+  -- with (merge a b) being invoked to handle the mappings they have in common
+  union : {A : Set} → (A → A → A) → A ctx → A ctx → A ctx
 
   -- The primary way to test membership is to use _∈_,
   -- but this can be used in cases where using _∈_
@@ -86,15 +90,6 @@ module contexts where
   ... | Inl x<hx       = None
   ... | Inr (Inl refl) = Some ha
   ... | Inr (Inr hx<x) = t ⦃⦃ diff-1 hx<x ⦄⦄
-
-  ---- some definitions ----
-
-  union' : {A : Set} → A ctx → A ctx → Nat → A ctx
-  union' Γ1 [] _ = Γ1
-  union' Γ1 ((hx , ha) :: Γ2) offset
-    = union' (Γ1 ,, (hx + offset , ha)) Γ2 (1+ hx + offset)
-
-  Γ1 ∪ Γ2 = union' Γ1 Γ2 0
 
   ---- lemmas ----
 
@@ -436,6 +431,21 @@ module contexts where
   ... | Inl (_ , x∈Γ) = abort (somenotnone ((! (lookup-cons-2 x∈Γ)) · x#Γ))
   ... | Inr x#'Γ      = x#'Γ
 
+  ---- some definitions ----
+
+  merge' : {A : Set} → (A → A → A) → Maybe A → A → A
+  merge' merge ma1 a2
+    with ma1
+  ... | None    = a2
+  ... | Some a1 = merge a1 a2
+
+  union' : {A : Set} → (A → A → A) → A ctx → A ctx → Nat → A ctx
+  union' merge Γ1 [] _ = Γ1
+  union' merge Γ1 ((hx , ha) :: Γ2) offset
+    = union' merge (Γ1 ,, (hx + offset , merge' merge (Γ1 ⦃⦃ hx + offset ⦄⦄) ha)) Γ2 (1+ hx + offset)
+
+  union merge Γ1 Γ2 = union' merge Γ1 Γ2 0
+
   ---- union theorems ----
 
   lemma-math' : ∀{x x1 n} → x ≠ x1 + (n + 1+ x)
@@ -445,52 +455,86 @@ module contexts where
           | +comm {1+ x1 + n} {x}
       = n≠n+1+m
 
-  lemma-union'-0 : {A : Set} {Γ1 Γ2 : A ctx} {x n : Nat} {a : A} →
+  lemma-union'-0 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x n : Nat} {a : A} →
                     (x , a) ∈ Γ1 →
-                    (x , a) ∈ union' Γ1 Γ2 (n + 1+ x)
+                    (x , a) ∈ union' m Γ1 Γ2 (n + 1+ x)
   lemma-union'-0 {Γ2 = []} x∈Γ1 = x∈Γ1
   lemma-union'-0 {Γ2 = (x1 , a1) :: Γ2} {x} {n} x∈Γ1
     rewrite ! (+assc {1+ x1} {n} {1+ x})
       = lemma-union'-0 {Γ2 = Γ2} {n = 1+ x1 + n} (x∈Γ→x∈Γ+ (lemma-math' {x1 = x1} {n}) x∈Γ1)
 
-  lemma-union'-1 : {A : Set} {Γ1 Γ2 : A ctx} {x n : Nat} {a : A} →
+  lemma-union'-1 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x n : Nat} {a : A} →
                     (x , a) ∈ Γ1 →
                     (n≤x : n ≤ x) →
                     (difference n≤x) # Γ2 →
-                    (x , a) ∈ union' Γ1 Γ2 n
+                    (x , a) ∈ union' m Γ1 Γ2 n
   lemma-union'-1 {Γ2 = []} {x} x∈Γ1 n≤x x-n#Γ2 = x∈Γ1
-  lemma-union'-1 {Γ1 = Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2
+  lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2
     with <dec x (x1 + n)
-  ... | Inl x<x1+n
+  lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n
+    with Γ1 ⦃⦃ x1 + n ⦄⦄
+  lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | Some a'
     = tr
-        (λ y → (x , a) ∈ union' (Γ1 ,, (x1 + n , a1)) Γ2 y)
-        (n+1+m==1+n+m {difference (π1 x<x1+n)} · 1+ap (m-n+n==m (π1 x<x1+n)))
-        (lemma-union'-0 {Γ2 = Γ2} (x∈Γ→x∈Γ+ (π2 x<x1+n) x∈Γ1))
-  ... | Inr (Inl refl)
+         (λ y → (x , a) ∈ union' m (Γ1 ,, (x1 + n , m a' a1)) Γ2 y)
+         (n+1+m==1+n+m {difference (π1 x<x1+n)} · 1+ap (m-n+n==m (π1 x<x1+n)))
+         (lemma-union'-0 {Γ2 = Γ2} (x∈Γ→x∈Γ+ (π2 x<x1+n) x∈Γ1))
+  lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inl x<x1+n | None
+    = tr
+         (λ y → (x , a) ∈ union' m (Γ1 ,, (x1 + n , a1)) Γ2 y)
+         (n+1+m==1+n+m {difference (π1 x<x1+n)} · 1+ap (m-n+n==m (π1 x<x1+n)))
+         (lemma-union'-0 {Γ2 = Γ2} (x∈Γ→x∈Γ+ (π2 x<x1+n) x∈Γ1))
+  lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inr (Inl refl)
     rewrite +comm {x1} {n} | n+m-n==m n≤x
       = abort (x-n#Γ2 (_ , InH))
-  ... | Inr (Inr x1+n<x)
+  lemma-union'-1 {m = m} {Γ1} {(x1 , a1) :: Γ2} {x} {n} {a} x∈Γ1 n≤x x-n#Γ2 | Inr (Inr x1+n<x)
     rewrite (! (a+b==c→a==c-b (+assc {diff-1 x1+n<x} · m-n+n==m (n<m→1+n≤m x1+n<x)) n≤x))
       = lemma-union'-1
           (x∈Γ→x∈Γ+ (flip (π2 x1+n<x)) x∈Γ1)
           (n<m→1+n≤m x1+n<x)
           λ {(_ , x-x1-n∈Γ2) → x-n#Γ2 (_ , InT x-x1-n∈Γ2)}
 
-  lemma-union'-2 : {A : Set} {Γ1 Γ2 : A ctx} {x n : Nat} {a : A} →
+  lemma-union'-2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x n : Nat} {a : A} →
+                    (x + n) # Γ1 →
                     (x , a) ∈ Γ2 →
-                    (x + n , a) ∈ union' Γ1 Γ2 n
-  lemma-union'-2 {Γ1 = Γ1} (InH {Γ = Γ})
-    = lemma-union'-0 {Γ2 = Γ} {n = Z} (x,a∈Γ,,x,a {Γ = Γ1})
-  lemma-union'-2 {n = n} (InT {x = x} {s} x∈Γ2)
+                    (x + n , a) ∈ union' m Γ1 Γ2 n
+  lemma-union'-2 {Γ1 = Γ1} x+n#Γ1 (InH {Γ = Γ2})
+    rewrite lookup-cp-1 x+n#Γ1
+      = lemma-union'-0 {Γ2 = Γ2} {n = Z} (x,a∈Γ,,x,a {Γ = Γ1})
+  lemma-union'-2 {Γ1 = Γ1} {n = n} x+n#Γ1 (InT {Γ = Γ2} {x = x} {s} x∈Γ2)
     rewrite +assc {x} {1+ s} {n}
-      = lemma-union'-2 x∈Γ2
+    with Γ1 ⦃⦃ s + n ⦄⦄
+  ... | Some a'
+    = lemma-union'-2
+        (λ {(_ , x∈Γ1+) →
+             x+n#Γ1 (_ , x∈Γ+→x∈Γ (flip (lemma-math' {x1 = Z})) x∈Γ1+)})
+        x∈Γ2
+  ... | None
+    = lemma-union'-2
+        (λ {(_ , x∈Γ1+) →
+             x+n#Γ1 (_ , x∈Γ+→x∈Γ (flip (lemma-math' {x1 = Z})) x∈Γ1+)})
+        x∈Γ2
 
-  lemma-union'-3 : {A : Set} {Γ1 Γ2 : A ctx} {x n : Nat} →
-                    dom (union' Γ1 Γ2 n) x →
+  lemma-union'-3 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x n : Nat} {a1 a2 : A} →
+                    (x + n , a1) ∈ Γ1 →
+                    (x , a2) ∈ Γ2 →
+                    (x + n , m a1 a2) ∈ union' m Γ1 Γ2 n
+  lemma-union'-3 {Γ1 = Γ1} x+n∈Γ1 (InH {Γ = Γ2})
+    rewrite lookup-cons-2 x+n∈Γ1
+      = lemma-union'-0 {Γ2 = Γ2} {n = Z} (x,a∈Γ,,x,a {Γ = Γ1})
+  lemma-union'-3 {Γ1 = Γ1} {n = n} x+n∈Γ1 (InT {Γ = Γ2} {x = x} {s} x∈Γ2)
+    rewrite +assc {x} {1+ s} {n}
+    with Γ1 ⦃⦃ s + n ⦄⦄
+  ... | Some a'
+    = lemma-union'-3 (x∈Γ→x∈Γ+ (flip (lemma-math' {x1 = Z})) x+n∈Γ1) x∈Γ2
+  ... | None
+    = lemma-union'-3 (x∈Γ→x∈Γ+ (flip (lemma-math' {x1 = Z})) x+n∈Γ1) x∈Γ2
+
+  lemma-union'-4 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x n : Nat} →
+                    dom (union' m Γ1 Γ2 n) x →
                     dom Γ1 x ∨ (Σ[ s ∈ Nat ] (x == n + s ∧ dom Γ2 s))
-  lemma-union'-3 {Γ2 = []} x∈un = Inl x∈un
-  lemma-union'-3 {Γ2 = (x1 , a1) :: Γ2} {x = x} {n} x∈un
-    with lemma-union'-3 {Γ2 = Γ2} x∈un
+  lemma-union'-4 {Γ2 = []} x∈un = Inl x∈un
+  lemma-union'-4 {Γ1 = Γ1} {(x1 , a1) :: Γ2} {x} {n} x∈un
+    with lemma-union'-4 {Γ2 = Γ2} x∈un
   ... | Inr (s , refl , _ , s∈Γ2)
     rewrite +comm {x1} {n}
           | ! (n+1+m==1+n+m {n + x1} {s})
@@ -505,27 +549,38 @@ module contexts where
     rewrite +comm {x1} {n}
       = Inl (_ , x∈Γ+→x∈Γ x≠n+x1 x∈Γ1+)
 
-  x,a∈Γ2→x,a∈Γ1∪Γ2 : {A : Set} {Γ1 Γ2 : A ctx} {x : Nat} {a : A} →
-                        (x , a) ∈ Γ2 →
-                        (x , a) ∈ Γ1 ∪ Γ2
-  x,a∈Γ2→x,a∈Γ1∪Γ2 {x = x} h
-    with lemma-union'-2 {n = Z} h
+  x,a∈Γ1→x∉Γ2→x,a∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x : Nat} {a : A} →
+                              (x , a) ∈ Γ1 →
+                              x # Γ2 →
+                              (x , a) ∈ union m Γ1 Γ2
+  x,a∈Γ1→x∉Γ2→x,a∈Γ1∪Γ2 {Γ2 = Γ2} x∈Γ1 x#Γ2
+    = lemma-union'-1 x∈Γ1 0≤n (tr (λ y → y # Γ2) (! (n+m-n==m 0≤n)) x#Γ2)
+
+  x∉Γ1→x,a∈Γ2→x,a∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x : Nat} {a : A} →
+                              x # Γ1 →
+                              (x , a) ∈ Γ2 →
+                              (x , a) ∈ union m Γ1 Γ2
+  x∉Γ1→x,a∈Γ2→x,a∈Γ1∪Γ2 {Γ1 = Γ1} {x = x} x#Γ1 x∈Γ2
+    with lemma-union'-2 {n = Z} (tr (λ y → y # Γ1) (! n+Z==n) x#Γ1) x∈Γ2
   ... | rslt
     rewrite n+Z==n {x}
       = rslt
 
-  x,a∈Γ1→x#Γ2→x,a∈Γ1∪Γ2 : {A : Set} {Γ1 Γ2 : A ctx} {x : Nat} {a : A} →
-                              (x , a) ∈ Γ1 →
-                              x # Γ2 →
-                              (x , a) ∈ Γ1 ∪ Γ2
-  x,a∈Γ1→x#Γ2→x,a∈Γ1∪Γ2 {Γ2 = Γ2} x∈Γ1 x#Γ2
-    = lemma-union'-1 x∈Γ1 0≤n (tr (λ y → y # Γ2) (! (n+m-n==m 0≤n)) x#Γ2)
+  x∈Γ1→x∈Γ2→x∈Γ1∪Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x : Nat} {a1 a2 : A} →
+                              (x , a1) ∈ Γ1 →
+                              (x , a2) ∈ Γ2 →
+                              (x , m a1 a2) ∈ union m Γ1 Γ2
+  x∈Γ1→x∈Γ2→x∈Γ1∪Γ2 {Γ1 = Γ1} {Γ2} {x} {a1} x∈Γ1 x∈Γ2
+    with lemma-union'-3 (tr (λ y → (y , a1) ∈ Γ1) (! n+Z==n) x∈Γ1) x∈Γ2
+  ... | rslt
+    rewrite n+Z==n {x}
+      = rslt
 
-  x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 : {A : Set} {Γ1 Γ2 : A ctx} {x : Nat} →
-                          dom (Γ1 ∪ Γ2) x →
+  x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 : {A : Set} {m : A → A → A} {Γ1 Γ2 : A ctx} {x : Nat} →
+                          dom (union m Γ1 Γ2) x →
                           dom Γ1 x ∨ dom Γ2 x
   x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2
-    with lemma-union'-3 {n = Z} x∈Γ1∪Γ2
+    with lemma-union'-4 {n = Z} x∈Γ1∪Γ2
   x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inl x'∈Γ1 = Inl x'∈Γ1
   x∈Γ1∪Γ2→x∈Γ1∨x∈Γ2 x∈Γ1∪Γ2 | Inr (_ , refl , x'∈Γ2) = Inr x'∈Γ2
 

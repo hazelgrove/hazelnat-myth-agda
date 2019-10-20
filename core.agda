@@ -2,6 +2,7 @@ open import Nat
 open import Prelude
 open import List
 open import contexts
+open import unions
 
 module core where
   -- types
@@ -14,8 +15,8 @@ module core where
   -- arrow type constructors bind very tightly
   infixr 25  _==>_
 
+  -- type contexts, hole contexts, and datatype environments
   tctx = typ ctx
-  -- TODO we should restrict this to exclude arrow types
   hctx = (tctx ∧ typ) ctx
   denv = Σ[ dctx ∈ tctx ctx ]
     ∀{d1 d2 cctx1 cctx2 c} →
@@ -40,34 +41,43 @@ module core where
 
   -- simple value typing
   data _⊢_::ⱽ_ : denv → val → typ → Set where
-    TSVUnit : ∀{Σ'} → Σ' ⊢ ⟨⟩ ::ⱽ ⟨⟩
-    TSVPair : ∀{Σ' v1 v2 τ1 τ2} →
-                Σ' ⊢ v1 ::ⱽ τ1 →
-                Σ' ⊢ v2 ::ⱽ τ2 →
-                Σ' ⊢ ⟨ v1 , v2 ⟩ ::ⱽ ⟨ τ1 × τ2 ⟩
-    TSVCtor : ∀{Σ' d cctx c v τ} →
-                (d , cctx) ∈ π1 Σ' →
-                (c , τ) ∈ cctx →
-                Σ' ⊢ v ::ⱽ τ →
-                Σ' ⊢ C[ c ] v ::ⱽ D[ d ]
+    VTUnit : ∀{Σ'} → Σ' ⊢ ⟨⟩ ::ⱽ ⟨⟩
+    VTPair : ∀{Σ' v1 v2 τ1 τ2} →
+               Σ' ⊢ v1 ::ⱽ τ1 →
+               Σ' ⊢ v2 ::ⱽ τ2 →
+               Σ' ⊢ ⟨ v1 , v2 ⟩ ::ⱽ ⟨ τ1 × τ2 ⟩
+    VTCtor : ∀{Σ' d cctx c v τ} →
+               (d , cctx) ∈ π1 Σ' →
+               (c , τ) ∈ cctx →
+               Σ' ⊢ v ::ⱽ τ →
+               Σ' ⊢ C[ c ] v ::ⱽ D[ d ]
 
   -- example typing
   data _,_⊢_:·_ : hctx → denv → ex → typ → Set where
-    TAUnit : ∀{Δ Σ'} → Δ , Σ' ⊢ ⟨⟩ :· ⟨⟩
-    TAPair : ∀{Δ Σ' ex1 ex2 τ1 τ2} →
-               Δ , Σ' ⊢ ex1 :· τ1 →
-               Δ , Σ' ⊢ ex2 :· τ2 →
-               Δ , Σ' ⊢ ⟨ ex1 , ex2 ⟩ :· ⟨ τ1 × τ2 ⟩
-    TACtor : ∀{Δ Σ' d cctx c ex τ} →
-               (d , cctx) ∈ π1 Σ' →
-               (c , τ) ∈ cctx →
-               Δ , Σ' ⊢ ex :· τ →
-               Δ , Σ' ⊢ C[ c ] ex :· D[ d ]
-    TADC   : ∀{Δ Σ' τ} → Δ , Σ' ⊢ ¿¿ :· τ
-    TAMap  : ∀{Δ Σ' v ex τ1 τ2} →
-               Σ' ⊢ v ::ⱽ τ1 →
-               Δ , Σ' ⊢ ex :· τ2 →
-               Δ , Σ' ⊢ v ↦ ex :· τ1 ==> τ2
+    XTUnit  : ∀{Δ Σ'} → Δ , Σ' ⊢ ⟨⟩ :· ⟨⟩
+    XTPair  : ∀{Δ Σ' ex1 ex2 τ1 τ2} →
+                Δ , Σ' ⊢ ex1 :· τ1 →
+                Δ , Σ' ⊢ ex2 :· τ2 →
+                Δ , Σ' ⊢ ⟨ ex1 , ex2 ⟩ :· ⟨ τ1 × τ2 ⟩
+    XTCtor  : ∀{Δ Σ' d cctx c ex τ} →
+                (d , cctx) ∈ π1 Σ' →
+                (c , τ) ∈ cctx →
+                Δ , Σ' ⊢ ex :· τ →
+                Δ , Σ' ⊢ C[ c ] ex :· D[ d ]
+    XTTop   : ∀{Δ Σ' τ} → Δ , Σ' ⊢ ¿¿ :· τ
+    XTInOut : ∀{Δ Σ' v ex τ1 τ2} →
+                Σ' ⊢ v ::ⱽ τ1 →
+                Δ , Σ' ⊢ ex :· τ2 →
+                Δ , Σ' ⊢ v ↦ ex :· τ1 ==> τ2
+
+  -- the two possible prj indices
+  data prj-idx : Set where
+    P1 : prj-idx
+    P2 : prj-idx
+
+  prj : {A : Set} → prj-idx → A → A → A
+  prj P1 a1 a2 = a1
+  prj P2 a1 a2 = a2
 
   mutual
     record rule : Set where
@@ -77,28 +87,27 @@ module core where
         parm   : Nat
         branch : exp
 
-    -- Expressions (Sketches)
+    -- Expressions
     data exp : Set where
       fix_⦇·λ_=>_·⦈ : Nat → Nat → exp → exp
-      X[_]          : Nat → exp
       _∘_           : exp → exp → exp
+      X[_]          : Nat → exp
       ⟨⟩            : exp
       ⟨_,_⟩         : exp → exp → exp
-      fst           : exp → exp
-      snd           : exp → exp
+      prj[_]_       : prj-idx → exp → exp
       C[_]_         : Nat → exp → exp
       case_of⦃·_·⦄ : exp → rule ctx → exp
       ??[_]         : Nat → exp
       PBE:assert    : exp → exp → exp
 
+  -- u is fresh in e
   data hole-name-new : (e : exp) → (u : Nat) → Set where
     HNNFix  : ∀{x f e u} → hole-name-new e u → hole-name-new (fix f ⦇·λ x => e ·⦈) u
     HNNVar  : ∀{x u} → hole-name-new (X[ x ]) u
     HNNAp   : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (e1 ∘ e2) u
     HNNUnit : ∀{u} → hole-name-new ⟨⟩ u
     HNNPair : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new ⟨ e1 , e2 ⟩ u
-    HNNFst  : ∀{e u} → hole-name-new e u → hole-name-new (fst e) u
-    HNNSnd  : ∀{e u} → hole-name-new e u → hole-name-new (snd e) u
+    HNNPrj  : ∀{e i u} → hole-name-new e u → hole-name-new (prj[ i ] e) u
     HNNCtor : ∀{c e u} → hole-name-new e u → hole-name-new (C[ c ] e) u
     HNNCase : ∀{e rules u} →
                 hole-name-new e u →
@@ -107,14 +116,14 @@ module core where
     HNNHole : ∀{u' u} → u' ≠ u → hole-name-new (??[ u' ]) u
     HNNAsrt : ∀{e1 e2 u} → hole-name-new e1 u → hole-name-new e2 u → hole-name-new (PBE:assert e1 e2) u
 
+  -- e1 and e2 do not have any hole names in common
   data holes-disjoint : (e1 : exp) → (e2 : exp) → Set where
     HDFix  : ∀{x f e e'} → holes-disjoint e e' → holes-disjoint (fix f ⦇·λ x => e ·⦈) e'
     HDVar  : ∀{x e'} → holes-disjoint (X[ x ]) e'
     HDAp   : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (e1 ∘ e2) e'
     HDUnit : ∀{e'} → holes-disjoint ⟨⟩ e'
     HDPair : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint ⟨ e1 , e2 ⟩ e'
-    HDFst  : ∀{e e'} → holes-disjoint e e' → holes-disjoint (fst e) e'
-    HDSnd  : ∀{e e'} → holes-disjoint e e' → holes-disjoint (snd e) e'
+    HDPrj  : ∀{i e e'} → holes-disjoint e e' → holes-disjoint (prj[ i ] e) e'
     HDCtor : ∀{c e e'} → holes-disjoint e e' → holes-disjoint (C[ c ] e) e'
     HDCase : ∀{e rules e'} →
                holes-disjoint e e' →
@@ -123,14 +132,14 @@ module core where
     HDHole : ∀{u e'} → hole-name-new e' u → holes-disjoint (??[ u ]) e'
     HDAsrt : ∀{e1 e2 e'} → holes-disjoint e1 e' → holes-disjoint e2 e' → holes-disjoint (PBE:assert e1 e2) e'
 
+  -- e ecomplete iff e contains no holes
   data _ecomplete : exp → Set where
     ECFix  : ∀{f x e} → e ecomplete → fix f ⦇·λ x => e ·⦈ ecomplete
     ECVar  : ∀{x} → X[ x ] ecomplete
     ECAp   : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → (e1 ∘ e2) ecomplete
     ECUnit : ⟨⟩ ecomplete
     ECPair : ∀{e1 e2} → e1 ecomplete → e2 ecomplete → ⟨ e1 , e2 ⟩ ecomplete
-    ECFst  : ∀{e} → e ecomplete → (fst e) ecomplete
-    ECSnd  : ∀{e} → e ecomplete → (snd e) ecomplete
+    ECPrj  : ∀{i e} → e ecomplete → (prj[ i ] e) ecomplete
     ECCtor : ∀{c e} → e ecomplete → (C[ c ] e) ecomplete
     ECCase : ∀{e rules} →
                e ecomplete →
@@ -140,62 +149,53 @@ module core where
 
   -- type assignment for expressions
   data _,_,_⊢_::_ : hctx → denv → tctx → exp → typ → Set where
-    TAFix  : ∀{Δ Σ' Γ f x e τ1 τ2} →
-               Δ , Σ' , (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢ e :: τ2 →
-               Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ1 ==> τ2
-    TAVar  : ∀{Δ Σ' Γ x τ} → (x , τ) ∈ Γ → Δ , Σ' , Γ ⊢ X[ x ] :: τ
-    TAApp  : ∀{Δ Σ' Γ f arg τ1 τ2} →
-               holes-disjoint f arg →
-               Δ , Σ' , Γ ⊢ f :: τ1 ==> τ2 →
-               Δ , Σ' , Γ ⊢ arg :: τ1 →
-               Δ , Σ' , Γ ⊢ f ∘ arg :: τ2
-    TAUnit : ∀{Δ Σ' Γ} → Δ , Σ' , Γ ⊢ ⟨⟩ :: ⟨⟩
-    TAPair : ∀{Δ Σ' Γ e1 e2 τ1 τ2} →
-               holes-disjoint e1 e2 →
-               Δ , Σ' , Γ ⊢ e1 :: τ1 →
-               Δ , Σ' , Γ ⊢ e2 :: τ2 →
-               Δ , Σ' , Γ ⊢ ⟨ e1 , e2 ⟩ :: ⟨ τ1 × τ2 ⟩
-    TAFst  : ∀{Δ Σ' Γ e τ1 τ2} →
-               Δ , Σ' , Γ ⊢ e :: ⟨ τ1 × τ2 ⟩ →
-               Δ , Σ' , Γ ⊢ fst e :: τ1
-    TASnd  : ∀{Δ Σ' Γ e τ1 τ2} →
-               Δ , Σ' , Γ ⊢ e :: ⟨ τ1 × τ2 ⟩ →
-               Δ , Σ' , Γ ⊢ snd e :: τ2
-    TACtor : ∀{Δ Σ' Γ d cctx c e τ} →
-               (d , cctx) ∈ π1 Σ' →
-               (c , τ) ∈ cctx →
-               Δ , Σ' , Γ ⊢ e :: τ →
-               Δ , Σ' , Γ ⊢ C[ c ] e :: D[ d ]
-    TACase : ∀{Δ Σ' Γ d cctx e rules τ} →
-               (d , cctx) ∈ π1 Σ' →
-               Δ , Σ' , Γ ⊢ e :: D[ d ] →
-               -- There must be a rule for each constructor, i.e. case exhuastiveness
-               (∀{c} → dom cctx c → dom rules c) →
-               (∀{c xc ec} →
-                  (c , |C xc => ec) ∈ rules →
-                    holes-disjoint ec e ∧
-                    (∀{c' xc' ec'} → (c' , |C xc' => ec') ∈ rules → c ≠ c' → holes-disjoint ec ec') ∧
-                    -- The constructor of each rule must be of the right datatype, and the branch must type-check
-                    Σ[ τc ∈ typ ] (
-                       (c , τc) ∈ cctx ∧
-                       Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
-               Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
-    TAHole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
-    TAAsrt : ∀{Δ Σ' Γ e1 e2 τ} →
-               holes-disjoint e1 e2 →
-               Δ , Σ' , Γ ⊢ e1 :: τ →
-               Δ , Σ' , Γ ⊢ e2 :: τ →
-               Δ , Σ' , Γ ⊢ PBE:assert e1 e2 :: ⟨⟩
+    TFix  : ∀{Δ Σ' Γ f x e τ1 τ2} →
+              Δ , Σ' , (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢ e :: τ2 →
+              Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ1 ==> τ2
+    TVar  : ∀{Δ Σ' Γ x τ} → (x , τ) ∈ Γ → Δ , Σ' , Γ ⊢ X[ x ] :: τ
+    THole : ∀{Δ Σ' Γ u τ} → (u , (Γ , τ)) ∈ Δ → Δ , Σ' , Γ ⊢ ??[ u ] :: τ
+    TUnit : ∀{Δ Σ' Γ} → Δ , Σ' , Γ ⊢ ⟨⟩ :: ⟨⟩
+    TPair : ∀{Δ Σ' Γ e1 e2 τ1 τ2} →
+              holes-disjoint e1 e2 →
+              Δ , Σ' , Γ ⊢ e1 :: τ1 →
+              Δ , Σ' , Γ ⊢ e2 :: τ2 →
+              Δ , Σ' , Γ ⊢ ⟨ e1 , e2 ⟩ :: ⟨ τ1 × τ2 ⟩
+    TCtor : ∀{Δ Σ' Γ d cctx c e τ} →
+              (d , cctx) ∈ π1 Σ' →
+              (c , τ) ∈ cctx →
+              Δ , Σ' , Γ ⊢ e :: τ →
+              Δ , Σ' , Γ ⊢ C[ c ] e :: D[ d ]
+    TApp  : ∀{Δ Σ' Γ f arg τ1 τ2} →
+              holes-disjoint f arg →
+              Δ , Σ' , Γ ⊢ f :: τ1 ==> τ2 →
+              Δ , Σ' , Γ ⊢ arg :: τ1 →
+              Δ , Σ' , Γ ⊢ f ∘ arg :: τ2
+    TPrj  : ∀{Δ Σ' Γ i e τ1 τ2} →
+              Δ , Σ' , Γ ⊢ e :: ⟨ τ1 × τ2 ⟩ →
+              Δ , Σ' , Γ ⊢ prj[ i ] e :: prj i τ1 τ2
+    TCase : ∀{Δ Σ' Γ d cctx e rules τ} →
+              (d , cctx) ∈ π1 Σ' →
+              Δ , Σ' , Γ ⊢ e :: D[ d ] →
+              -- There must be a rule for each constructor, i.e. case exhuastiveness
+              (∀{c} → dom cctx c → dom rules c) →
+              (∀{c xc ec} →
+                 (c , |C xc => ec) ∈ rules →
+                   holes-disjoint ec e ∧
+                   (∀{c' xc' ec'} → (c' , |C xc' => ec') ∈ rules → c ≠ c' → holes-disjoint ec ec') ∧
+                   -- The constructor of each rule must be of the right datatype, and the branch must type-check
+                   Σ[ τc ∈ typ ] (
+                      (c , τc) ∈ cctx ∧
+                      Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
+              Δ , Σ' , Γ ⊢ case e of⦃· rules ·⦄ :: τ
+    TAssert : ∀{Δ Σ' Γ e1 e2 τ} →
+                holes-disjoint e1 e2 →
+                Δ , Σ' , Γ ⊢ e1 :: τ →
+                Δ , Σ' , Γ ⊢ e2 :: τ →
+                Δ , Σ' , Γ ⊢ PBE:assert e1 e2 :: ⟨⟩
 
   mutual
     env : Set
     env = result ctx
-
-    data _env-complete : env → Set where
-      ENVC : ∀{E} → (∀{x rx} → (x , rx) ∈ E → rx rcomplete) → E env-complete
-
-    data _env-final : env → Set where
-      EF : ∀{E} → (∀{x rx} → (x , rx) ∈ E → rx final) → E env-final
 
     -- results - evaluation takes expressions to results, but results aren't necessarily final
     data result : Set where
@@ -205,45 +205,36 @@ module core where
       C[_]_            : Nat → result → result
       [_]??[_]         : env → Nat → result
       _∘_              : result → result → result
-      fst              : result → result
-      snd              : result → result
+      prj[_]_          : prj-idx → result → result
       [_]case_of⦃·_·⦄ : env → result → rule ctx → result
+      C⁻¹[_]_           : Nat → result → result
 
-    -- TODO maybe delete
-    -- values are final and almost complete (i.e. they can only have holes in environments or under binders)
-    data _value : result → Set where
-      VFix  : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ value
-      VUnit : ⟨⟩ value
-      VPair : ∀{r1 r2} → r1 final → r2 final → ⟨ r1 , r2 ⟩ value
-      VCon  : ∀{c r} → r final → (C[ c ] r) value
+  mutual
+    data _env-final : env → Set where
+      EFNone : ∅ env-final
+      EFInd  : ∀{E x r} → E env-final → r final → (E ,, (x , r)) env-final
 
     -- final results are those that cannot be evaluated further
     data _final : result → Set where
-      FFix  : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ final
-      FUnit : ⟨⟩ final
-      FPair : ∀{r1 r2} → r1 final → r2 final → ⟨ r1 , r2 ⟩ final
-      FCon  : ∀{c r} → r final → (C[ c ] r) final
-      FHole : ∀{E u} → E env-final → [ E ]??[ u ] final
-      FAp   : ∀{r1 r2} → r1 final → r2 final → (∀{E f x e} → r1 ≠ [ E ]fix f ⦇·λ x => e ·⦈) → (r1 ∘ r2) final
-      FFst  : ∀{r} → r final → (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) → (fst r) final
-      FSnd  : ∀{r} → r final → (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) → (snd r) final
-      FCase : ∀{E r rules} → r final → (∀{c r'} → r ≠ (C[ c ] r')) → E env-final → [ E ]case r of⦃· rules ·⦄ final
+      FDet   : ∀{r} → r det → r final
+      FIndet : ∀{r} → r indet → r final
 
-    -- complete results have no holes at all
-    data _rcomplete : result → Set where
-      RCFix  : ∀{E f x e} → E env-complete → e ecomplete → [ E ]fix f ⦇·λ x => e ·⦈ rcomplete
-      RCUnit : ⟨⟩ rcomplete
-      RCPair : ∀{r1 r2} → r1 rcomplete → r2 rcomplete → ⟨ r1 , r2 ⟩ rcomplete
-      RCCtor : ∀{c r} → r rcomplete → (C[ c ] r) rcomplete
-      RCAp   : ∀{r1 r2} → r1 rcomplete → r2 rcomplete → (r1 ∘ r2) rcomplete
-      RCFst  : ∀{r} → r rcomplete → (fst r) rcomplete
-      RCSnd  : ∀{r} → r rcomplete → (snd r) rcomplete
-      RCCase : ∀{E r rules} →
-                 E env-complete →
-                 r rcomplete →
-                 (∀{c rule} → (c , rule) ∈ rules → (rule.branch rule) ecomplete) →
-                 [ E ]case r of⦃· rules ·⦄ rcomplete
+    -- final results that can be eliminated (or in the case of ⟨⟩, that don't need to be)
+    data _det : result → Set where
+      DFix  : ∀{E f x e} → E env-final → [ E ]fix f ⦇·λ x => e ·⦈ det
+      DUnit : ⟨⟩ det
+      DPair : ∀{r1 r2} → r1 final → r2 final → ⟨ r1 , r2 ⟩ det
+      DCtor : ∀{c r} → r final → (C[ c ] r) det
 
+    -- indeterminate results are incomplete and cannot be further reduced except by resumption
+    data _indet : result → Set where
+      IDHole : ∀{E u} → E env-final → [ E ]??[ u ] indet
+      IDApp  : ∀{r1 r2} → r1 indet → r2 final → (r1 ∘ r2) indet
+      IDPrj  : ∀{i r} → r indet → (prj[ i ] r) indet
+      IDCase : ∀{E r rules} → E env-final → r indet → [ E ]case r of⦃· rules ·⦄ indet
+
+  mutual
+    -- type assignment for environments
     data _,_,_⊢_ : hctx → denv → tctx → env → Set where
       EnvId  : ∀{Δ Σ'} → Δ , Σ' , ∅ ⊢ ∅
       EnvInd : ∀{Δ Σ' Γ E x τx rx} →
@@ -253,31 +244,32 @@ module core where
 
     -- type assignment for results
     data _,_⊢_·:_ : hctx → denv → result → typ → Set where
-      TAFix        : ∀{Δ Σ' Γ E f x e τ} →
+      RTFix        : ∀{Δ Σ' Γ E f x e τ} →
                        Δ , Σ' , Γ ⊢ E →
                        Δ , Σ' , Γ ⊢ fix f ⦇·λ x => e ·⦈ :: τ →
                        Δ , Σ' ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ·: τ
-      TAApp        : ∀{Δ Σ' f arg τ1 τ2} →
-                       Δ , Σ' ⊢ f ·: τ1 ==> τ2 →
-                       Δ , Σ' ⊢ arg ·: τ1 →
-                       Δ , Σ' ⊢ f ∘ arg ·: τ2
-      TAUnit       : ∀{Δ Σ'} → Δ , Σ' ⊢ ⟨⟩ ·: ⟨⟩
-      TAPair       : ∀{Δ Σ' r1 r2 τ1 τ2} →
+      RTHole       : ∀{Δ Σ' Γ E u τ} →
+                       (u , (Γ , τ)) ∈ Δ →
+                       Δ , Σ' , Γ ⊢ E →
+                       Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
+      RTUnit       : ∀{Δ Σ'} → Δ , Σ' ⊢ ⟨⟩ ·: ⟨⟩
+      RTPair       : ∀{Δ Σ' r1 r2 τ1 τ2} →
                        Δ , Σ' ⊢ r1 ·: τ1 →
                        Δ , Σ' ⊢ r2 ·: τ2 →
                        Δ , Σ' ⊢ ⟨ r1 , r2 ⟩ ·: ⟨ τ1 × τ2 ⟩
-      TAFst        : ∀{Δ Σ' r τ1 τ2} →
-                       Δ , Σ' ⊢ r ·: ⟨ τ1 × τ2 ⟩ →
-                       Δ , Σ' ⊢ fst r ·: τ1
-      TASnd        : ∀{Δ Σ' r τ1 τ2} →
-                       Δ , Σ' ⊢ r ·: ⟨ τ1 × τ2 ⟩ →
-                       Δ , Σ' ⊢ snd r ·: τ2
-      TACtor       : ∀{Δ Σ' d cctx c r τ} →
+      RTCtor       : ∀{Δ Σ' d cctx c r τ} →
                        (d , cctx) ∈ π1 Σ' →
                        (c , τ) ∈ cctx →
                        Δ , Σ' ⊢ r ·: τ →
                        Δ , Σ' ⊢ C[ c ] r ·: D[ d ]
-      TACase       : ∀{Δ Σ' Γ E d cctx r rules τ} →
+      RTApp        : ∀{Δ Σ' f arg τ1 τ2} →
+                       Δ , Σ' ⊢ f ·: τ1 ==> τ2 →
+                       Δ , Σ' ⊢ arg ·: τ1 →
+                       Δ , Σ' ⊢ f ∘ arg ·: τ2
+      RTPrj        : ∀{Δ Σ' i r τ1 τ2} →
+                       Δ , Σ' ⊢ r ·: ⟨ τ1 × τ2 ⟩ →
+                       Δ , Σ' ⊢ prj[ i ] r ·: prj i τ1 τ2
+      RTCase       : ∀{Δ Σ' Γ E d cctx r rules τ} →
                        (d , cctx) ∈ π1 Σ' →
                        Δ , Σ' , Γ ⊢ E →
                        Δ , Σ' ⊢ r ·: D[ d ] →
@@ -290,16 +282,17 @@ module core where
                                (c , τc) ∈ cctx ∧
                                Δ , Σ' , (Γ ,, (xc , τc)) ⊢ ec :: τ)) →
                        Δ , Σ' ⊢ [ E ]case r of⦃· rules ·⦄ ·: τ
-      TAHole       : ∀{Δ Σ' Γ E u τ} →
-                       (u , (Γ , τ)) ∈ Δ →
-                       Δ , Σ' , Γ ⊢ E →
-                       Δ , Σ' ⊢ [ E ]??[ u ] ·: τ
+      RTUnwrapCtor : ∀{Δ Σ' d cctx c r τ} →
+                       (d , cctx) ∈ π1 Σ' →
+                       (c , τ) ∈ cctx →
+                       Δ , Σ' ⊢ r ·: D[ d ] →
+                       Δ , Σ' ⊢ C⁻¹[ c ] r ·: τ
 
-  world         = env ∧ ex
-  worlds        = List world
+  excon         = env ∧ ex
+  excons        = List excon
   assertions    = List (result ∧ val)
-  constraints   = exp ctx ∧ worlds ctx
   hole-fillings = exp ctx
+  constraints   = hole-fillings ∧ excons ctx
 
   record goal : Set where
     inductive
@@ -308,170 +301,122 @@ module core where
       g-tctx   : tctx
       g-id     : Nat
       g-typ    : typ
-      g-worlds : worlds
+      g-excons : excons
 
   goals = List goal
 
-  data Coerce_:=_ : result → val → Set where
-    CoerceUnit : Coerce ⟨⟩ := ⟨⟩
+  -- value-to-example coercion
+  ⌊_⌋ : val → ex
+  ⌊ ⟨⟩ ⌋ = ⟨⟩
+  ⌊ ⟨ v1 , v2 ⟩ ⌋ = ⟨ ⌊ v1 ⌋ , ⌊ v2 ⌋ ⟩
+  ⌊ C[ c ] v ⌋ = C[ c ] ⌊ v ⌋
+
+  -- result-to-value coercion
+  data ⌈_⌉:=_ : result → val → Set where
+    CoerceUnit : ⌈ ⟨⟩ ⌉:= ⟨⟩
     CoercePair : ∀{r1 r2 v1 v2} →
-                   Coerce r1 := v1 →
-                   Coerce r2 := v2 →
-                   Coerce ⟨ r1 , r2 ⟩ := ⟨ v1 , v2 ⟩
+                   ⌈ r1 ⌉:= v1 →
+                   ⌈ r2 ⌉:= v2 →
+                   ⌈ ⟨ r1 , r2 ⟩ ⌉:= ⟨ v1 , v2 ⟩
     CoerceCtor : ∀{c r v} →
-                   Coerce r := v →
-                   Coerce C[ c ] r := C[ c ] v
+                   ⌈ r ⌉:= v →
+                   ⌈ C[ c ] r ⌉:= C[ c ] v
 
-  data LiftE_:=_ : val → exp → Set where
-    LiftEUnit : LiftE ⟨⟩ := ⟨⟩
-    LiftEPair : ∀{e1 e2 v1 v2} →
-                  LiftE v1 := e1 →
-                  LiftE v2 := e2 →
-                  LiftE ⟨ v1 , v2 ⟩ := ⟨ e1 , e2 ⟩
-    LiftECtor : ∀{c v e} →
-                  LiftE v := e →
-                  LiftE C[ c ] v := C[ c ] e
+  -- excons typing
+  data _,_⊢_::ˣ_,_ : hctx → denv → excons → tctx → typ → Set where
+    TXNil : ∀{Δ Σ' Γ τ} → Δ , Σ' ⊢ [] ::ˣ Γ , τ
+    TXInd : ∀{Δ Σ' X E ex Γ τ} →
+              Δ , Σ' ⊢ X ::ˣ Γ , τ →
+              Δ , Σ' , Γ ⊢ E →
+              Δ , Σ' ⊢ ex :· τ →
+              Δ , Σ' ⊢ ((E , ex) :: X) ::ˣ Γ , τ
 
-  -- worlds typing
-  data _,_⊢_::ᵂ_,_ : hctx → denv → worlds → tctx → typ → Set where
-    TAWNil : ∀{Δ Σ' Γ τ} → Δ , Σ' ⊢ [] ::ᵂ Γ , τ
-    TAWRec : ∀{Δ Σ' W E ex Γ τ} →
-               Δ , Σ' ⊢ W ::ᵂ Γ , τ →
-               Δ , Σ' , Γ ⊢ E →
-               Δ , Σ' ⊢ ex :· τ →
-               Δ , Σ' ⊢ (E , ex) :: W ::ᵂ Γ , τ
+  -- type assignment for hole fillings
+  data _,_⊢ᴴ_ : hctx → denv → hole-fillings → Set where
+    TFNil : ∀{Δ Σ'} → Δ , Σ' ⊢ᴴ ∅
+    TFInd : ∀{Δ Σ' F u Γ τ e} →
+              (u , Γ , τ) ∈ Δ →
+              Δ , Σ' ⊢ᴴ F →
+              Δ , Σ' , Γ ⊢ e :: τ →
+              Δ , Σ' ⊢ᴴ (F ,, (u , e))
 
-  -- type checking for hole fillings
-  data _,_⊢ₕ_ : hctx → denv → hole-fillings → Set where
-    TANil      : ∀{Δ Σ'} → Δ , Σ' ⊢ₕ ∅
-    TAHoleFill : ∀{Δ Σ' H u e Γ τ} →
-                   Δ , Σ' ⊢ₕ H →
-                   (u , Γ , τ) ∈ Δ →
-                   Δ , Σ' , Γ ⊢ e :: τ →
-                   Δ , Σ' ⊢ₕ (H ,, (u , e))
+  {- TODO - we have to decide between this version and the one prior
+  _,_⊢ₕ_ : hctx → denv → hole-fillings → Set
+  Δ , Σ' ⊢ₕ F = ∀{u e} →
+                  (u , e) ∈ F →
+                  Σ[ Γ ∈ tctx ] Σ[ τ ∈ typ ] (
+                     (u , Γ , τ) ∈ Δ ∧
+                     Δ , Σ' , Γ ⊢ e :: τ)
+  -}
 
-  -- constraints merge
-  data _⊕_:=_ : constraints → constraints → constraints → Set where
-    MergeNoWorlds : ∀{F1 F2} →
-                      F1 ## F2 →
-                      (F1 , ∅) ⊕ (F2 , ∅) := (F1 ∪ F2 , ∅)
-    MergeLeft   : ∀{F1 U1 F2 U2 F3 U3 u W} →
-                    (F1 , U1) ⊕ (F2 , U2) := (F3 , U3) →
-                    u # U2 →
-                    (F1 , U1 ,, (u , W)) ⊕ (F2 , U2) := (F3 , U3 ,, (u , W))
-    MergeRight  : ∀{F1 U1 F2 U2 F3 U3 u W} →
-                    (F1 , U1) ⊕ (F2 , U2) := (F3 , U3) →
-                    u # U1 →
-                    (F1 , U1) ⊕ (F2 , U2 ,, (u , W)) := (F3 , U3 ,, (u , W))
-    MergeWorlds : ∀{F1 U1 F2 U2 F3 U3 u W1 W2} →
-                    (F1 , U1) ⊕ (F2 , U2) := (F3 , U3) →
-                    (F1 , U1 ,, (u , W1)) ⊕ (F2 , U2 ,, (u , W2)) := (F3 , U3 ,, (u , W1 ++ W2))
-
-  -- hole substitution
-  data _[_/??]:=_ : exp → hole-fillings → exp → Set where
-    SHoleFill : ∀{H u e} → (u , e) ∈ H → ??[ u ] [ H /??]:= e
-    SHoleUnf  : ∀{H u}   → u # H       → ??[ u ] [ H /??]:= ??[ u ]
-    SFix      : ∀{H f x e e'} →
-                  e [ H /??]:= e' →
-                  (fix f ⦇·λ x => e ·⦈) [ H /??]:= (fix f ⦇·λ x => e' ·⦈)
-    SVar      : ∀{H x} → X[ x ] [ H /??]:= X[ x ]
-    SApp      : ∀{H ef ef' earg earg'} →
-                  ef [ H /??]:= ef' →
-                  earg [ H /??]:= earg' →
-                  (ef ∘ earg) [ H /??]:= (ef' ∘ earg')
-    SUnit     : ∀{H} → ⟨⟩ [ H /??]:= ⟨⟩
-    SPair     : ∀{H e1 e1' e2 e2'} →
-                  e1 [ H /??]:= e1' →
-                  e2 [ H /??]:= e2' →
-                  ⟨ e1 , e2 ⟩ [ H /??]:= ⟨ e1' , e2' ⟩
-    SFst      : ∀{H e e'} →
-                  e [ H /??]:= e' →
-                  fst e [ H /??]:= fst e'
-    SSnd      : ∀{H e e'} →
-                  e [ H /??]:= e' →
-                  snd e [ H /??]:= snd e'
-    SCtor     : ∀{H c e e'} →
-                  e [ H /??]:= e' →
-                  (C[ c ] e) [ H /??]:= (C[ c ] e')
-    SMatch    : ∀{H e e' rules rules'} →
-                  (∀{c} → dom rules c → dom rules' c) →
-                  (∀{c} → dom rules' c → dom rules c) →
-                  e [ H /??]:= e' →
-                  (∀{c x-c x-c' e-c e-c'} →
-                     (c , |C x-c => e-c) ∈ rules →
-                     (c , |C x-c' => e-c') ∈ rules' →
-                     x-c == x-c' ∧ e-c [ H /??]:= e-c') →
-                  case e of⦃· rules ·⦄ [ H /??]:= case e' of⦃· rules' ·⦄
-    SAsrt     : ∀{H e1 e1' e2 e2'} →
-                  e1 [ H /??]:= e1' →
-                  e2 [ H /??]:= e2' →
-                  PBE:assert e1 e2 [ H /??]:= PBE:assert e1' e2'
-
+  -- these are used to determine the "order" in which result consistency rules are checked
   not-both-pair : (r r' : result) → Set
   not-both-pair r r' = (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩)  ∨ (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩)
   not-both-ctor : (r r' : result) → Set
   not-both-ctor r r' = (∀{c r''} → r ≠ (C[ c ] r'')) ∨ (∀{c r''} → r' ≠ (C[ c ] r''))
 
   -- result consistency
-  data Constraints⦃_,_⦄:=_ : result → result → assertions → Set where
-    RCRefl : ∀{r} → Constraints⦃ r , r ⦄:= []
-    RCPair : ∀{r1 r2 r'1 r'2 A1 A2} →
-               (_==_ {A = result} ⟨ r1 , r2 ⟩ ⟨ r'1 , r'2 ⟩ → ⊥) →
-               Constraints⦃ r1 , r'1 ⦄:= A1 →
-               Constraints⦃ r2 , r'2 ⦄:= A2 →
-               Constraints⦃ ⟨ r1 , r2 ⟩ , ⟨ r'1 , r'2 ⟩ ⦄:= A1 ++ A2
-    RCCtor : ∀{c r r' A} →
-               (_==_ {A = result} (C[ c ] r) (C[ c ] r') → ⊥) →
-               Constraints⦃ r , r' ⦄:= A →
-               Constraints⦃ C[ c ] r , C[ c ] r' ⦄:= A
-    RCVal1 : ∀{r r' v} →
-               r ≠ r' →
-               not-both-pair r r' →
-               not-both-ctor r r' →
-               Coerce r := v →
-               Constraints⦃ r , r' ⦄:= ((r' , v) :: [])
-    RCVal2 : ∀{r r' v'} →
-               r ≠ r' →
-               not-both-pair r r' →
-               not-both-ctor r r' →
-               Coerce r' := v' →
-               Constraints⦃ r , r' ⦄:= ((r , v') :: [])
+  data _≡⌊_⌋_ : result → assertions → result → Set where
+    RCRefl    : ∀{r} → r ≡⌊ [] ⌋ r
+    RCPair    : ∀{r1 r2 r'1 r'2 A1 A2} →
+                  (_==_ {A = result} ⟨ r1 , r2 ⟩ ⟨ r'1 , r'2 ⟩ → ⊥) →
+                  r1 ≡⌊ A1 ⌋ r'1 →
+                  r2 ≡⌊ A2 ⌋ r'2 →
+                  ⟨ r1 , r2 ⟩ ≡⌊ A1 ++ A2 ⌋ ⟨ r'1 , r'2 ⟩
+    RCCtor    : ∀{c r r' A} →
+                  (_==_ {A = result} (C[ c ] r) (C[ c ] r') → ⊥) →
+                  r ≡⌊ A ⌋ r' →
+                  (C[ c ] r) ≡⌊ A ⌋ (C[ c ] r')
+    RCAssert1 : ∀{r1 r2 v2 A} →
+                  r1 ≠ r2 →
+                  not-both-pair r1 r2 →
+                  not-both-ctor r1 r2 →
+                  ⌈ r2 ⌉:= v2 →
+                  A == (r1 , v2) :: [] →
+                  r1 ≡⌊ A ⌋ r2
+    RCAssert2 : ∀{r1 r2 v1 A} →
+                  r1 ≠ r2 →
+                  not-both-pair r1 r2 →
+                  not-both-ctor r1 r2 →
+                  ⌈ r1 ⌉:= v1 →
+                  A == (r2 , v1) :: [] →
+                  r1 ≡⌊ A ⌋ r2
 
   -- Generic result consistency failure - this goes through if results are not consistent
-  data Constraints⦃_,_⦄:=∅ : result → result → Set where
+  data _≢_ : result → result → Set where
     RCFPair1    : ∀{r1 r2 r'1 r'2} →
-                    Constraints⦃ r1 , r'1 ⦄:=∅ →
-                    Constraints⦃ ⟨ r1 , r2 ⟩ , ⟨ r'1 , r'2 ⟩ ⦄:=∅
+                    r1 ≢ r'1 →
+                    ⟨ r1 , r2 ⟩ ≢ ⟨ r'1 , r'2 ⟩
     RCFPair2    : ∀{r1 r2 r'1 r'2} →
-                    Constraints⦃ r2 , r'2 ⦄:=∅ →
-                    Constraints⦃ ⟨ r1 , r2 ⟩ , ⟨ r'1 , r'2 ⟩ ⦄:=∅
+                    r2 ≢ r'2 →
+                    ⟨ r1 , r2 ⟩ ≢ ⟨ r'1 , r'2 ⟩
     RCFCtorMM   : ∀{c c' r r'} →
                     c ≠ c' →
-                    Constraints⦃ C[ c ] r , C[ c' ] r' ⦄:=∅
+                    (C[ c ] r) ≢ (C[ c' ] r')
     RCFCtor     : ∀{c r r'} →
-                    Constraints⦃ r , r' ⦄:=∅ →
-                    Constraints⦃ C[ c ] r , C[ c ] r' ⦄:=∅
+                    r ≢ r' →
+                    (C[ c ] r) ≢ (C[ c ] r')
     RCFNoCoerce : ∀{r r'} →
                     r ≠ r' →
                     not-both-pair r r' →
                     not-both-ctor r r' →
-                    (∀{ex} → Coerce r  := ex → ⊥) →
-                    (∀{ex} → Coerce r' := ex → ⊥) →
-                    Constraints⦃ r , r' ⦄:=∅
+                    (∀{v} → ⌈ r  ⌉:= v → ⊥) →
+                    (∀{v} → ⌈ r' ⌉:= v → ⊥) →
+                    r ≢ r'
 
-  -- The evaluation, constraint collection, and backpropagation judgments accept "fuel",
-  -- which defines whether or not they can recurse indefinitely, and, if not, then the
-  -- numerical limit. The limit is not on the recursion depth, but rather on the number
-  -- of "beta reductions", interpreted a bit loosely to include case evaluations.
+  -- Various judgments accept "fuel", which defines whether or not they can recurse indefinitely,
+  -- and, if not, then the numerical limit. The limit is not on the recursion depth, but rather
+  -- on the number of "beta reductions", interpreted a bit loosely to include case evaluations.
   -- - If ⌊ ⛽ ⌋ is ∞, then there is no beta reduction limit,
   --   but the judgment will not be satisfied unless evaluation eventually terminates.
   -- - If ⌊ ⛽ ⌋ is ⛽⟨ n ⟩, then the beta reduction limit is at most n,
-  --   but if the limit is reached, the evaluation and backpropagation judgments are
-  --   satisfied automatically, whereas other judgments fail automatically
+  --   but if the limit is reached, then "success" judgments will not go through,
+  --   but "failure" judgments will be satisfied automatically.
   data Fuel : Set where
     ∞ : Fuel
     ⛽⟨_⟩ : Nat → Fuel
 
+  -- fuel depletion
   data _⛽⇓_ : Fuel → Fuel → Set where
     CF∞ : ∞ ⛽⇓ ∞
     CF⛽ : ∀{n} → ⛽⟨ 1+ n ⟩ ⛽⇓ ⛽⟨ n ⟩
@@ -487,62 +432,54 @@ module core where
 
   -- Generic big step evaluation
   data _⊢_⌊_⌋⇒_⊣_ : env → exp → Fuel → result → assertions → Set where
-    EFix             : ∀{E ⛽ f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
-    EVar             : ∀{E ⛽ x r} → (x , r) ∈ E → E ⊢ X[ x ] ⌊ ⛽ ⌋⇒ r ⊣ []
-    EHole            : ∀{E ⛽ u} → E ⊢ ??[ u ] ⌊ ⛽ ⌋⇒ [ E ]??[ u ] ⊣ []
-    EUnit            : ∀{E ⛽} → E ⊢ ⟨⟩ ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ []
-    EPair            : ∀{E ⛽ e1 e2 r1 r2 A1 A2} →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
-                         E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ A1 ++ A2
-    ECtor            : ∀{E ⛽ c e r A} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
-                         E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ A
-    EAppFix          : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 A1 r2 A2 r A} →
-                         ⛽ ⛽⇓ ⛽↓ →
-                         r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
-                         (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ A →
-                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ A1 ++ A2 ++ A
-    EAppUnfinished   : ∀{E ⛽ e1 e2 r1 A1 r2 A2} →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
-                         (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
-                         E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ A1 ++ A2
-    EFst             : ∀{E ⛽ e r1 r2 A} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ A →
-                         E ⊢ fst e ⌊ ⛽ ⌋⇒ r1 ⊣ A
-    ESnd             : ∀{E ⛽ e r1 r2 A} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ A →
-                         E ⊢ snd e ⌊ ⛽ ⌋⇒ r2 ⊣ A
-    EFstUnfinished   : ∀{E ⛽ e r A} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
-                         (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
-                         E ⊢ fst e ⌊ ⛽ ⌋⇒ fst r ⊣ A
-    ESndUnfinished   : ∀{E ⛽ e r A} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
-                         (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
-                         E ⊢ snd e ⌊ ⛽ ⌋⇒ snd r ⊣ A
-    EMatch           : ∀{E ⛽ ⛽↓ e rules c xc ec r' A' r A} →
-                         ⛽ ⛽⇓ ⛽↓ →
-                         (c , |C xc => ec) ∈ rules →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ A' →
-                         (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒ r ⊣ A →
-                         E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ r ⊣ A' ++ A
-    EMatchUnfinished : ∀{E ⛽ e rules r A} →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
-                         (∀{c e'} → r ≠ (C[ c ] e')) →
-                         E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ [ E ]case r of⦃· rules ·⦄ ⊣ A
-    EAsrt            : ∀{E ⛽ e1 r1 A1 e2 r2 A2 A3} →
-                         E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
-                         E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
-                         Constraints⦃ r1 , r2 ⦄:= A3 →
-                         E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ A1 ++ A2 ++ A3
+    EUnit       : ∀{E ⛽} → E ⊢ ⟨⟩ ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ []
+    EPair       : ∀{E ⛽ e1 e2 r1 r2 A1 A2} →
+                    E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
+                    E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
+                    E ⊢ ⟨ e1 , e2 ⟩ ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ A1 ++ A2
+    ECtor       : ∀{E ⛽ c e r A} →
+                    E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
+                    E ⊢ C[ c ] e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ A
+    EFix        : ∀{E ⛽ f x e} → E ⊢ fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇒ [ E ]fix f ⦇·λ x => e ·⦈ ⊣ []
+    EVar        : ∀{E ⛽ x r} → (x , r) ∈ E → E ⊢ X[ x ] ⌊ ⛽ ⌋⇒ r ⊣ []
+    EHole       : ∀{E ⛽ u} → E ⊢ ??[ u ] ⌊ ⛽ ⌋⇒ [ E ]??[ u ] ⊣ []
+    EAppFix     : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 A1 r2 A2 r A} →
+                    ⛽ ⛽⇓ ⛽↓ →
+                    E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
+                    r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                    E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
+                    (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ A →
+                    E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ r ⊣ A1 ++ A2 ++ A
+    EAppIndet   : ∀{E ⛽ e1 e2 r1 A1 r2 A2} →
+                    E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
+                    (∀{Ef f x ef} → r1 ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
+                    E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
+                    E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒ (r1 ∘ r2) ⊣ A1 ++ A2
+    EPrj        : ∀{E ⛽ i e r1 r2 A} →
+                    E ⊢ e ⌊ ⛽ ⌋⇒ ⟨ r1 , r2 ⟩ ⊣ A →
+                    E ⊢ prj[ i ] e ⌊ ⛽ ⌋⇒ prj i r1 r2 ⊣ A
+    EPrjIndet   : ∀{E ⛽ i e r A} →
+                    E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
+                    (∀{r1 r2} → r ≠ ⟨ r1 , r2 ⟩) →
+                    E ⊢ prj[ i ] e ⌊ ⛽ ⌋⇒ prj[ i ] r ⊣ A
+    ECase       : ∀{E ⛽ ⛽↓ e rules c xc ec r A' rc A} →
+                    ⛽ ⛽⇓ ⛽↓ →
+                    (c , |C xc => ec) ∈ rules →
+                    E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ A →
+                    (E ,, (xc , r)) ⊢ ec ⌊ ⛽↓ ⌋⇒ rc ⊣ A' →
+                    E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ rc ⊣ A ++ A'
+    ECaseIndet  : ∀{E ⛽ e rules r A} →
+                    E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
+                    (∀{c rc} → r ≠ (C[ c ] rc)) →
+                    E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒ [ E ]case r of⦃· rules ·⦄ ⊣ A
+    EAssert     : ∀{E ⛽ e1 r1 A1 e2 r2 A2 A3} →
+                    E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
+                    E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
+                    r1 ≡⌊ A3 ⌋ r2 →
+                    E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒ ⟨⟩ ⊣ A1 ++ A2 ++ A3
 
-  -- TODO failure cases may be out of date and need of update
-  -- Generic evaluation failure - this goes through if evaluation would fail due to unsatisfiablility
-  -- of a some constraint collection that occurs during evaluation, or if the fuel runs out.
+  -- Generic evaluation failure - this goes through if evaluation would fail due to failure
+  -- of some assertion that occurs during evaluation, or if the fuel runs out.
   data _⊢_⌊_⌋⇒∅ : env → exp → Fuel → Set where
     EFPair1      : ∀{E ⛽ e1 e2} →
                      E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
@@ -559,349 +496,478 @@ module core where
     EFAppArg     : ∀{E ⛽ e1 e2} →
                      E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
                      E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
-    EFAppFixEval : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 k1 r2 k2} →
+    EFAppEval    : ∀{E ⛽ ⛽↓ e1 e2 Ef f x ef r1 A1 r2 A2} →
                      ⛽ ⛽⇓ ⛽↓ →
+                     E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
                      r1 == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                     E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ k1 →
-                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ k2 →
+                     E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
                      (Ef ,, (f , r1) ,, (x , r2)) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
                      E ⊢ e1 ∘ e2 ⌊ ⛽ ⌋⇒∅
-    EFFst        : ∀{E ⛽ e} →
+    EFPrj        : ∀{E ⛽ i e} →
                      E ⊢ e ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ fst e ⌊ ⛽ ⌋⇒∅
-    EFSnd        : ∀{E ⛽ e} →
-                     E ⊢ e ⌊ ⛽ ⌋⇒∅ →
-                     E ⊢ snd e ⌊ ⛽ ⌋⇒∅
-    EFMatchScrut : ∀{E ⛽ e rules} →
+                     E ⊢ prj[ i ] e ⌊ ⛽ ⌋⇒∅
+    EFCaseScrut  : ∀{E ⛽ e rules} →
                      E ⊢ e ⌊ ⛽ ⌋⇒∅ →
                      E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
-    EFMatchRule  : ∀{E ⛽ ⛽↓ e rules c xc ec r' k'} →
+    EFCaseRule   : ∀{E ⛽ ⛽↓ e rules c xc ec r A} →
                      ⛽ ⛽⇓ ⛽↓ →
                      (c , |C xc => ec) ∈ rules →
-                     E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r') ⊣ k' →
-                     (E ,, (xc , r')) ⊢ ec ⌊ ⛽↓ ⌋⇒∅ →
+                     E ⊢ e ⌊ ⛽ ⌋⇒ (C[ c ] r) ⊣ A →
+                     (E ,, (xc , r)) ⊢ ec ⌊ ⛽↓ ⌋⇒∅ →
                      E ⊢ case e of⦃· rules ·⦄ ⌊ ⛽ ⌋⇒∅
-    EFAsrtL      : ∀{E ⛽ e1 e2} →
+    EFAssert1    : ∀{E ⛽ e1 e2} →
                      E ⊢ e1 ⌊ ⛽ ⌋⇒∅ →
                      E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
-    EFAsrtR      : ∀{E ⛽ e1 e2} →
+    EFAssert2    : ∀{E ⛽ e1 e2} →
                      E ⊢ e2 ⌊ ⛽ ⌋⇒∅ →
                      E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
-    EFAsrt       : ∀{E ⛽ e1 r1 A1 e2 r2 A2} →
+    EFAssert     : ∀{E ⛽ e1 r1 A1 e2 r2 A2} →
                      E ⊢ e1 ⌊ ⛽ ⌋⇒ r1 ⊣ A1 →
                      E ⊢ e2 ⌊ ⛽ ⌋⇒ r2 ⊣ A2 →
-                     Constraints⦃ r1 , r2 ⦄:=∅ →
+                     r1 ≢ r2 →
                      E ⊢ PBE:assert e1 e2 ⌊ ⛽ ⌋⇒∅
     EFLimit      : ∀{E e} → E ⊢ e ⌊ ⛽⟨ 0 ⟩ ⌋⇒∅
 
   -- resumption
   mutual
-    data _⊢_⌊_⌋:⇨_ : hole-fillings → env → Fuel → env → Set where
-      RENil : ∀{⛽ F} → F ⊢ ∅ ⌊ ⛽ ⌋:⇨ ∅
-      REInd : ∀{⛽ F E E' x r r'} →
-                F ⊢ E ⌊ ⛽ ⌋:⇨ E' →
-                F ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                F ⊢ E ,, (x , r) ⌊ ⛽ ⌋:⇨ (E' ,, (x , r'))
+    data _⊢_⌊_⌋:⇨_:=_ : hole-fillings → env → Fuel → env → assertions → Set where
+      RENil : ∀{⛽ F} → F ⊢ ∅ ⌊ ⛽ ⌋:⇨ ∅ := []
+      REInd : ∀{⛽ F E E' x r r' A A'} →
+                F ⊢ E ⌊ ⛽ ⌋:⇨ E' := A →
+                F ⊢ r ⌊ ⛽ ⌋⇨ r' := A' →
+                F ⊢ E ,, (x , r) ⌊ ⛽ ⌋:⇨ (E' ,, (x , r')) := A ++ A'
 
-    data _⊢_⌊_⌋⇨_ : hole-fillings → result → Fuel → result → Set where
-      RFix           : ∀{⛽ H E E' f x e} →
-                         H ⊢ E ⌊ ⛽ ⌋:⇨ E' →
-                         H ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇨ [ E' ]fix f ⦇·λ x => e ·⦈
-      RHoleFill      : ∀{⛽ H E u r r' e} →
-                         (u , e) ∈ H →
-                         E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ [] →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                         H ⊢ [ E ]??[ u ] ⌊ ⛽ ⌋⇨ r'
-      RHoleUnf       : ∀{⛽ H E E' u} →
-                         u # H →
-                         H ⊢ E ⌊ ⛽ ⌋:⇨ E' →
-                         H ⊢ [ E ]??[ u ] ⌊ ⛽ ⌋⇨ [ E' ]??[ u ]
-      RUnit          : ∀{⛽ H} → H ⊢ ⟨⟩ ⌊ ⛽ ⌋⇨ ⟨⟩
-      RPair          : ∀{⛽ H r1 r2 r1' r2'} →
-                         H ⊢ r1 ⌊ ⛽ ⌋⇨ r1' →
-                         H ⊢ r2 ⌊ ⛽ ⌋⇨ r2' →
-                         H ⊢ ⟨ r1 , r2 ⟩ ⌊ ⛽ ⌋⇨ ⟨ r1' , r2' ⟩
-      RCtor          : ∀{⛽ H c r r'} →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                         H ⊢ C[ c ] r ⌊ ⛽ ⌋⇨ (C[ c ] r')
-      RApp           : ∀{⛽ ⛽↓ H rf rarg r r' Ef f x ef rf' rarg'} →
-                         ⛽ ⛽⇓ ⛽↓ →
-                         H ⊢ rf ⌊ ⛽ ⌋⇨ rf' →
-                         rf' == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
-                         H ⊢ rarg ⌊ ⛽ ⌋⇨ rarg' →
-                         (Ef ,, (f , rf') ,, (x , rarg')) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ [] →
-                         H ⊢ r ⌊ ⛽↓ ⌋⇨ r' →
-                         H ⊢ rf ∘ rarg ⌊ ⛽ ⌋⇨ r'
-      RAppUnf        : ∀{⛽ H rf rarg rf' rarg'} →
-                         H ⊢ rf ⌊ ⛽ ⌋⇨ rf' →
-                         (∀{E f x e} → rf' ≠ [ E ]fix f ⦇·λ x => e ·⦈) →
-                         H ⊢ rarg ⌊ ⛽ ⌋⇨ rarg' →
-                         H ⊢ rf ∘ rarg ⌊ ⛽ ⌋⇨ (rf' ∘ rarg')
-      RFst           : ∀{⛽ H r r1 r2} →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ ⟨ r1 , r2 ⟩ →
-                         H ⊢ fst r ⌊ ⛽ ⌋⇨ r1
-      RFstUnf        : ∀{⛽ H r r'} →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                         (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩) →
-                         H ⊢ fst r ⌊ ⛽ ⌋⇨ fst r'
-      RSnd           : ∀{⛽ H r r1 r2} →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ ⟨ r1 , r2 ⟩ →
-                         H ⊢ snd r ⌊ ⛽ ⌋⇨ r2
-      RSndUnf        : ∀{⛽ H r r'} →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                         (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩) →
-                         H ⊢ snd r ⌊ ⛽ ⌋⇨ snd r'
-      RMatch         : ∀{⛽ H E r rules c xc ec r' rc} →
-                         (c , |C xc => ec) ∈ rules →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ (C[ c ] r') →
-                         H ⊢ [ E ]fix xc ⦇·λ xc => ec ·⦈ ∘ r' ⌊ ⛽ ⌋⇨ rc →
-                         H ⊢ [ E ]case r of⦃· rules ·⦄ ⌊ ⛽ ⌋⇨ rc
-      RMatchUnf      : ∀{⛽ H E E' r rules r'} →
-                         H ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                         (∀{c r''} → r' ≠ (C[ c ] r'')) →
-                         H ⊢ E ⌊ ⛽ ⌋:⇨ E' →
-                         H ⊢ [ E ]case r of⦃· rules ·⦄ ⌊ ⛽ ⌋⇨ [ E' ]case r' of⦃· rules ·⦄
+    data _⊢_⌊_⌋⇨_:=_ : hole-fillings → result → Fuel → result → assertions → Set where
+      RHoleResume  : ∀{⛽ F E u r r' e A A'} →
+                       (u , e) ∈ F →
+                       E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ r' := A' →
+                       F ⊢ [ E ]??[ u ] ⌊ ⛽ ⌋⇨ r' := A ++ A'
+      RHoleIndet   : ∀{⛽ F E E' u A} →
+                       u # F →
+                       F ⊢ E ⌊ ⛽ ⌋:⇨ E' := A →
+                       F ⊢ [ E ]??[ u ] ⌊ ⛽ ⌋⇨ [ E' ]??[ u ] := A
+      RUnit        : ∀{⛽ F} → F ⊢ ⟨⟩ ⌊ ⛽ ⌋⇨ ⟨⟩ := []
+      RPair        : ∀{⛽ F r1 r2 r1' r2' A1 A2} →
+                       F ⊢ r1 ⌊ ⛽ ⌋⇨ r1' := A1 →
+                       F ⊢ r2 ⌊ ⛽ ⌋⇨ r2' := A2 →
+                       F ⊢ ⟨ r1 , r2 ⟩ ⌊ ⛽ ⌋⇨ ⟨ r1' , r2' ⟩ := A1 ++ A2
+      RCtor        : ∀{⛽ F c r r' A} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ r' := A →
+                       F ⊢ C[ c ] r ⌊ ⛽ ⌋⇨ (C[ c ] r') := A
+      RApp         : ∀{⛽ ⛽↓ F r1 r2 r r' Ef f x ef r1' r2' A1 A2 Af A'} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       F ⊢ r1 ⌊ ⛽ ⌋⇨ r1' := A1 →
+                       r1' == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                       F ⊢ r2 ⌊ ⛽ ⌋⇨ r2' := A2 →
+                       (Ef ,, (f , r1') ,, (x , r2')) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ Af →
+                       F ⊢ r ⌊ ⛽↓ ⌋⇨ r' := A' →
+                       F ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨ r' := A1 ++ A2 ++ Af ++ A'
+      RAppIndet    : ∀{⛽ F r1 r2 r1' r2' A1 A2} →
+                       F ⊢ r1 ⌊ ⛽ ⌋⇨ r1' := A1 →
+                       (∀{Ef f x ef} → r1' ≠ [ Ef ]fix f ⦇·λ x => ef ·⦈) →
+                       F ⊢ r2 ⌊ ⛽ ⌋⇨ r2' := A2 →
+                       F ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨ (r1' ∘ r2') := A1 ++ A2
+      RFix         : ∀{⛽ F E E' f x e A} →
+                       F ⊢ E ⌊ ⛽ ⌋:⇨ E' := A →
+                       F ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇨ [ E' ]fix f ⦇·λ x => e ·⦈ := A
+      RPrj         : ∀{⛽ F i r r1 r2 A} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ ⟨ r1 , r2 ⟩ := A →
+                       F ⊢ prj[ i ] r ⌊ ⛽ ⌋⇨ prj i r1 r2 := A
+      RPrjIndet    : ∀{⛽ F i r r' A} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ r' := A →
+                       (∀{r1 r2} → r' ≠ ⟨ r1 , r2 ⟩) →
+                       F ⊢ prj[ i ] r ⌊ ⛽ ⌋⇨ prj[ i ] r' := A
+      RCase        : ∀{⛽ F E r rules c xc ec r' rc A A'} →
+                       (c , |C xc => ec) ∈ rules →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ (C[ c ] r') := A →
+                       F ⊢ [ E ]fix xc ⦇·λ xc => ec ·⦈ ∘ (C⁻¹[ c ] r) ⌊ ⛽ ⌋⇨ rc := A' →
+                       F ⊢ [ E ]case r of⦃· rules ·⦄ ⌊ ⛽ ⌋⇨ rc := A ++ A'
+      RCaseIndet   : ∀{⛽ F E E' r rules r' A A'} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ r' := A →
+                       (∀{c rc} → r' ≠ (C[ c ] rc)) →
+                       F ⊢ E ⌊ ⛽ ⌋:⇨ E' := A' →
+                       F ⊢ [ E ]case r of⦃· rules ·⦄ ⌊ ⛽ ⌋⇨ [ E' ]case r' of⦃· rules ·⦄ := A ++ A'
+      RUnwrapCtor  : ∀{⛽ F r c rc A} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ C[ c ] rc := A →
+                       F ⊢ C⁻¹[ c ] r ⌊ ⛽ ⌋⇨ rc := A
+      RUnwrapIndet : ∀{⛽ F c r r' A} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ r' := A →
+                       (∀{rc} → r' ≠ (C[ c ] rc)) →
+                       F ⊢ C⁻¹[ c ] r ⌊ ⛽ ⌋⇨ C⁻¹[ c ] r' := A
 
-  -- Constraint, Example World, and Example Satisfaction
+  -- Generic resumption failure - this goes through if resumption would fail due to failure
+  -- of some evaluation that occurs during resumption.
+  mutual
+    data _⊢_⌊_⌋:⇨∅ : hole-fillings → env → Fuel → Set where
+      RFERes : ∀{⛽ F E x r} →
+                 F ⊢ r ⌊ ⛽ ⌋⇨∅ →
+                 F ⊢ (E ,, (x , r)) ⌊ ⛽ ⌋:⇨∅
+      RFEEnv : ∀{⛽ F E x r} →
+                 F ⊢ E ⌊ ⛽ ⌋:⇨∅ →
+                 F ⊢ (E ,, (x , r)) ⌊ ⛽ ⌋:⇨∅
 
-  data _,_⌊_⌋⊨ᴿ_ : hole-fillings → result → Fuel → ex → Set where
-    XSNone  : ∀{⛽ H r} → H , r ⌊ ⛽ ⌋⊨ᴿ ¿¿
-    XSUnit  : ∀{⛽ H} → H , ⟨⟩ ⌊ ⛽ ⌋⊨ᴿ ⟨⟩
-    XSPair  : ∀{⛽ H r1 r2 ex1 ex2} →
-                H , r1 ⌊ ⛽ ⌋⊨ᴿ ex1 →
-                H , r2 ⌊ ⛽ ⌋⊨ᴿ ex2 →
-                H , ⟨ r1 , r2 ⟩ ⌊ ⛽ ⌋⊨ᴿ ⟨ ex1 , ex2 ⟩
-    XSCtor  : ∀{⛽ H r c ex} →
-                H , r ⌊ ⛽ ⌋⊨ᴿ ex →
-                H , C[ c ] r ⌊ ⛽ ⌋⊨ᴿ (C[ c ] ex)
-    XSInOut : ∀{⛽ H r1 r2 v2 ex r} →
-                 Coerce r2 := v2 →
-                 H ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨ r →
-                 H , r ⌊ ⛽ ⌋⊨ᴿ ex →
-                 H , r1 ⌊ ⛽ ⌋⊨ᴿ (v2 ↦ ex)
+      {- TODO we must choose between this approach and the one prior
+      RFE : ∀{⛽ F E x r} →
+              (x , r) ∈ E →
+              F ⊢ r ⌊ ⛽ ⌋⇨∅ →
+              F ⊢ E ⌊ ⛽ ⌋:⇨∅
+      -}
 
-  data _,_⌊_⌋⊨ᴱ_ : hole-fillings → exp → Fuel → worlds → Set where
-    CSEmpty      : ∀{⛽ H e} → H , e ⌊ ⛽ ⌋⊨ᴱ []
-    CSConstraint : ∀{⛽ H e E ex W r r'} →
-                     H , e ⌊ ⛽ ⌋⊨ᴱ W →
-                     E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ [] →
-                     H ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                     H , r' ⌊ ⛽ ⌋⊨ᴿ ex →
-                     H , e ⌊ ⛽ ⌋⊨ᴱ ((E , ex) :: W)
+    data _⊢_⌊_⌋⇨∅ : hole-fillings → result → Fuel → Set where
+      RFHoleEval   : ∀{⛽ F E u e} →
+                       (u , e) ∈ F →
+                       E ⊢ e ⌊ ⛽ ⌋⇒∅ →
+                       F ⊢ [ E ]??[ u ] ⌊ ⛽ ⌋⇨∅
+      RFHoleRes    : ∀{⛽ F E u e r A} →
+                       (u , e) ∈ F →
+                       E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
+                       F ⊢ r ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ [ E ]??[ u ] ⌊ ⛽ ⌋⇨∅
+      RFHoleIndet  : ∀{⛽ F E u} →
+                       u # F →
+                       F ⊢ E ⌊ ⛽ ⌋:⇨∅ →
+                       F ⊢ [ E ]??[ u ] ⌊ ⛽ ⌋⇨∅
+      RFPair1      : ∀{⛽ F r1 r2} →
+                       F ⊢ r1 ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ ⟨ r1 , r2 ⟩ ⌊ ⛽ ⌋⇨∅
+      RFPair2      : ∀{⛽ F r1 r2} →
+                       F ⊢ r2 ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ ⟨ r1 , r2 ⟩ ⌊ ⛽ ⌋⇨∅
+      RFCtor       : ∀{⛽ F c r} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ C[ c ] r ⌊ ⛽ ⌋⇨∅
+      RFAppFun     : ∀{⛽ F r1 r2} →
+                       F ⊢ r1 ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨∅
+      RFAppArg     : ∀{⛽ F r1 r2} →
+                       F ⊢ r2 ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨∅
+      RFAppEval    : ∀{⛽ ⛽↓ F r1 r2 Ef f x ef r1' r2' A1 A2} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       F ⊢ r1 ⌊ ⛽ ⌋⇨ r1' := A1 →
+                       r1' == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                       F ⊢ r2 ⌊ ⛽ ⌋⇨ r2' := A2 →
+                       (Ef ,, (f , r1') ,, (x , r2')) ⊢ ef ⌊ ⛽↓ ⌋⇒∅ →
+                       F ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨∅
+      RFAppRes     : ∀{⛽ ⛽↓ F r1 r2 Ef f x ef r1' r2' r A1 A2 Af} →
+                       ⛽ ⛽⇓ ⛽↓ →
+                       F ⊢ r1 ⌊ ⛽ ⌋⇨ r1' := A1 →
+                       r1' == [ Ef ]fix f ⦇·λ x => ef ·⦈ →
+                       F ⊢ r2 ⌊ ⛽ ⌋⇨ r2' := A2 →
+                       (Ef ,, (f , r1') ,, (x , r2')) ⊢ ef ⌊ ⛽↓ ⌋⇒ r ⊣ Af →
+                       F ⊢ r ⌊ ⛽↓ ⌋⇨∅ →
+                       F ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨∅
+      RFFix        : ∀{⛽ F E f x e} →
+                       F ⊢ E ⌊ ⛽ ⌋:⇨∅ →
+                       F ⊢ [ E ]fix f ⦇·λ x => e ·⦈ ⌊ ⛽ ⌋⇨∅
+      RFPrj        : ∀{⛽ F i r} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ prj[ i ] r ⌊ ⛽ ⌋⇨∅
+      RFCaseScrut  : ∀{⛽ F E r rules} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ [ E ]case r of⦃· rules ·⦄ ⌊ ⛽ ⌋⇨∅
+      RFCase       : ∀{⛽ F E r rules c xc ec r' A} →
+                       (c , |C xc => ec) ∈ rules →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ (C[ c ] r') := A →
+                       F ⊢ [ E ]fix xc ⦇·λ xc => ec ·⦈ ∘ (C⁻¹[ c ] r) ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ [ E ]case r of⦃· rules ·⦄ ⌊ ⛽ ⌋⇨∅
+      RFCaseIndet  : ∀{⛽ F E r rules r' A} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨ r' := A →
+                       (∀{c rc} → r' ≠ (C[ c ] rc)) →
+                       F ⊢ E ⌊ ⛽ ⌋:⇨∅ →
+                       F ⊢ [ E ]case r of⦃· rules ·⦄ ⌊ ⛽ ⌋⇨∅
+      RFUnwrapCtor : ∀{⛽ F c r} →
+                       F ⊢ r ⌊ ⛽ ⌋⇨∅ →
+                       F ⊢ C⁻¹[ c ] r ⌊ ⛽ ⌋⇨∅
+      RFLimit      : ∀{F r} → F ⊢ r ⌊ ⛽⟨ 0 ⟩ ⌋⇨∅
 
-  _⌊_⌋⊨_ : hole-fillings → Fuel → constraints → Set
-  H ⌊ ⛽ ⌋⊨ (F , U) =
-    (∀{u W} →
-       (u , W) ∈ U →
-       H , ??[ u ] ⌊ ⛽ ⌋⊨ᴱ W) ∧
-    (∀{u e} →
-       (u , e) ∈ F →
-       (u , e) ∈ H)
+  data Filter_:=_ : excons → excons → Set where
+    FilterNil : Filter [] := []
+    FilterYes : ∀{X X' E ex} →
+                  Filter X := X' →
+                  ex ≠ ¿¿ →
+                  Filter (E , ex) :: X := ((E , ex) :: X')
+    FilterNo  : ∀{X X' E} →
+                  Filter X := X' →
+                  Filter (E , ¿¿) :: X := X'
+
+  -- Assertion Satisfaction and Simplification
+  data _⌊_⌋⊨ᴬ_ : hole-fillings → Fuel → assertions → Set where
+    SANil : ∀{⛽ F} → F ⌊ ⛽ ⌋⊨ᴬ []
+    SAInd : ∀{⛽ F r v r' A A'} →
+              F ⌊ ⛽ ⌋⊨ᴬ A →
+              F ⊢ r ⌊ ⛽ ⌋⇨ r' := A' →
+              F ⌊ ⛽ ⌋⊨ᴬ A' →
+              ⌈ r' ⌉:= v →
+              F ⌊ ⛽ ⌋⊨ᴬ ((r , v) :: A)
+
+  -- Example Satisfaction (of Results)
+  data _⊢_⌊_⌋⊨ᴿ_ : hole-fillings → result → Fuel → ex → Set where
+    XSTop   : ∀{⛽ F r} → F ⊢ r ⌊ ⛽ ⌋⊨ᴿ ¿¿
+    XSUnit  : ∀{⛽ F} → F ⊢ ⟨⟩ ⌊ ⛽ ⌋⊨ᴿ ⟨⟩
+    XSPair  : ∀{⛽ F r1 r2 ex1 ex2} →
+                F ⊢ r1 ⌊ ⛽ ⌋⊨ᴿ ex1 →
+                F ⊢ r2 ⌊ ⛽ ⌋⊨ᴿ ex2 →
+                F ⊢ ⟨ r1 , r2 ⟩ ⌊ ⛽ ⌋⊨ᴿ ⟨ ex1 , ex2 ⟩
+    XSCtor  : ∀{⛽ F r c ex} →
+                F ⊢ r ⌊ ⛽ ⌋⊨ᴿ ex →
+                F ⊢ C[ c ] r ⌊ ⛽ ⌋⊨ᴿ (C[ c ] ex)
+    XSInOut : ∀{⛽ F r1 r2 v2 ex r A} →
+                ⌈ r2 ⌉:= v2 →
+                F ⊢ r1 ∘ r2 ⌊ ⛽ ⌋⇨ r := A →
+                F ⊢ r ⌊ ⛽ ⌋⊨ᴿ ex →
+                F ⌊ ⛽ ⌋⊨ᴬ A →
+                F ⊢ r1 ⌊ ⛽ ⌋⊨ᴿ (v2 ↦ ex)
+
+  -- Example Satisfaction (of Expressions)
+  data _⊢_⌊_⌋⊨ᴱ_ : hole-fillings → exp → Fuel → excons → Set where
+    SatNil : ∀{⛽ F e} → F ⊢ e ⌊ ⛽ ⌋⊨ᴱ []
+    SatTop : ∀{⛽ F e E X} →
+               F ⊢ e ⌊ ⛽ ⌋⊨ᴱ X →
+               F ⊢ e ⌊ ⛽ ⌋⊨ᴱ ((E , ¿¿) :: X)
+    SatInd : ∀{⛽ F e E ex X r r' A A'} →
+               ex ≠ ¿¿ →
+               F ⊢ e ⌊ ⛽ ⌋⊨ᴱ X →
+               E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
+               F ⊢ r ⌊ ⛽ ⌋⇨ r' := A' →
+               F ⊢ r' ⌊ ⛽ ⌋⊨ᴿ ex →
+               F ⌊ ⛽ ⌋⊨ᴬ A ++ A' →
+               F ⊢ e ⌊ ⛽ ⌋⊨ᴱ ((E , ex) :: X)
+
+  data _⌊_⌋⊨ᵁ_ : hole-fillings → Fuel → excons ctx → Set where
+    CSNil : ∀{⛽ F} → F ⌊ ⛽ ⌋⊨ᵁ ∅
+    CSInd : ∀{⛽ F U u X} →
+              F ⌊ ⛽ ⌋⊨ᵁ U →
+              F ⊢ ??[ u ] ⌊ ⛽ ⌋⊨ᴱ X →
+              F ⌊ ⛽ ⌋⊨ᵁ (U ,, (u , X))
+
+  -- Constraint Satisfaction
+  _⌊_⌋⊨ᴷ_ : hole-fillings → Fuel → constraints → Set
+  F ⌊ ⛽ ⌋⊨ᴷ (F0 , U) =
+    (∀{u e} → (u , e) ∈ F0 → (u , e) ∈ F) ∧
+    F ⌊ ⛽ ⌋⊨ᵁ U
+
+  -- constraints merge
+  _⊕_:=_ : constraints → constraints → constraints → Set
+  (F1 , U1) ⊕ (F2 , U2) := (F' , U') = F1 ≈ F2 ∧ F1 ∪ F2 == F' ∧ U1 ⊎ U2 == U'
 
   mutual
     -- example unevaluation
-    data _,_⊢⦇_,_⊨_⦈⌊_⌋:=ᵁ_ : hctx → denv → hole-fillings → result → ex → Fuel → constraints → Set where
-      XUNone       : ∀{⛽ Δ Σ' H r} → Δ , Σ' ⊢⦇ H , r ⊨ ¿¿ ⦈⌊ ⛽ ⌋:=ᵁ (∅ , ∅)
-      XUUnit       : ∀{⛽ Δ Σ' H} → Δ , Σ' ⊢⦇ H , ⟨⟩ ⊨ ⟨⟩ ⦈⌊ ⛽ ⌋:=ᵁ (∅ , ∅)
-      XUHole       : ∀{⛽ Δ Σ' H E u ex} →
-                       ex ≠ ¿¿ →
-                       Δ , Σ' ⊢⦇ H , [ E ]??[ u ] ⊨ ex ⦈⌊ ⛽ ⌋:=ᵁ (∅ , ■ (u , (E , ex) :: []))
-      XUApp        : ∀{⛽ Δ Σ' H r1 r2 ex v2 K} →
-                       ex ≠ ¿¿ →
-                       Coerce r2 := v2 →
-                       Δ , Σ' ⊢⦇ H , r1 ⊨ v2 ↦ ex ⦈⌊ ⛽ ⌋:=ᵁ K →
-                       Δ , Σ' ⊢⦇ H , r1 ∘ r2 ⊨ ex ⦈⌊ ⛽ ⌋:=ᵁ K
-      XUFix        : ∀{⛽ ⛽↓ Δ Σ' H E f x e rf varg rarg ex K} →
-                       ⛽ ⛽⇓ ⛽↓ →
-                       rf == [ E ]fix f ⦇·λ x => e ·⦈ →
-                       Coerce rarg := varg →
-                       Δ , Σ' ⊢⦇ H , e ⊨ ((E ,, (f , rf) ,, (x , rarg)) , ex) :: [] ⦈⌊ ⛽↓ ⌋:= K →
-                       Δ , Σ' ⊢⦇ H , rf ⊨ varg ↦ ex ⦈⌊ ⛽ ⌋:=ᵁ K
-      XUFst        : ∀{⛽ Δ Σ' H r ex K} →
-                       ex ≠ ¿¿ →
-                       Δ , Σ' ⊢⦇ H , r ⊨ ⟨ ex , ¿¿ ⟩ ⦈⌊ ⛽ ⌋:=ᵁ K →
-                       Δ , Σ' ⊢⦇ H , fst r ⊨ ex ⦈⌊ ⛽ ⌋:=ᵁ K
-      XUSnd        : ∀{⛽ Δ Σ' H r ex K} →
-                       ex ≠ ¿¿ →
-                       Δ , Σ' ⊢⦇ H , r ⊨ ⟨ ¿¿ , ex ⟩ ⦈⌊ ⛽ ⌋:=ᵁ K →
-                       Δ , Σ' ⊢⦇ H , snd r ⊨ ex ⦈⌊ ⛽ ⌋:=ᵁ K
-      XUMatch      : ∀{⛽ ⛽↓ Δ Σ' H F-guesses F' E r rules ex c-j x-j e-j r' K1 K2 K'} →
-                       ex ≠ ¿¿ →
-                       ⛽ ⛽⇓ ⛽↓ →
-                       K1 ⊕ K2 := K' →
-                       (c-j , |C x-j => e-j) ∈ rules →
-                       Δ , Σ' ⊢ₕ F-guesses →
-                       H ## F-guesses →
-                       F' == H ∪ F-guesses →
-                       F' ⊢ r ⌊ ⛽ ⌋⇨ (C[ c-j ] r') →
-                       K1 == (F-guesses , ∅) →
-                       Δ , Σ' ⊢⦇ F' , e-j ⊨ ((E ,, (x-j , r')) , ex) :: [] ⦈⌊ ⛽↓ ⌋:= K2 →
-                       Δ , Σ' ⊢⦇ H , [ E ]case r of⦃· rules ·⦄ ⊨ ex ⦈⌊ ⛽ ⌋:=ᵁ K'
-      XUPair       : ∀{⛽ Δ Σ' H r1 r2 ex1 ex2 K1 K2 K'} →
-                       K1 ⊕ K2 := K' →
-                       Δ , Σ' ⊢⦇ H , r1 ⊨ ex1 ⦈⌊ ⛽ ⌋:=ᵁ K1 →
-                       Δ , Σ' ⊢⦇ H , r2 ⊨ ex2 ⦈⌊ ⛽ ⌋:=ᵁ K2 →
-                       Δ , Σ' ⊢⦇ H , ⟨ r1 , r2 ⟩ ⊨ ⟨ ex1 , ex2 ⟩ ⦈⌊ ⛽ ⌋:=ᵁ K'
-      XUCtor       : ∀{⛽ Δ Σ' H c r ex K} →
-                       Δ , Σ' ⊢⦇ H , r ⊨ ex ⦈⌊ ⛽ ⌋:=ᵁ K →
-                       Δ , Σ' ⊢⦇ H , C[ c ] r ⊨ C[ c ] ex ⦈⌊ ⛽ ⌋:=ᵁ K
+    data _,_,_⊢_⇐⌊_⌋_:=_ : hctx → denv → hole-fillings → result → Fuel → ex → constraints → Set where
+      UTop        : ∀{⛽ Δ Σ' F r} → Δ , Σ' , F ⊢ r ⇐⌊ ⛽ ⌋ ¿¿ := (∅ , ∅)
+      UHole       : ∀{⛽ Δ Σ' F E u ex} →
+                      ex ≠ ¿¿ →
+                      Δ , Σ' , F ⊢ [ E ]??[ u ] ⇐⌊ ⛽ ⌋ ex := (∅ , ■ (u , (E , ex) :: []))
+      UUnit       : ∀{⛽ Δ Σ' F} → Δ , Σ' , F ⊢ ⟨⟩ ⇐⌊ ⛽ ⌋ ⟨⟩ := (∅ , ∅)
+      UCtor       : ∀{⛽ Δ Σ' F c r ex K} →
+                      Δ , Σ' , F ⊢ r ⇐⌊ ⛽ ⌋ ex := K →
+                      Δ , Σ' , F ⊢ C[ c ] r ⇐⌊ ⛽ ⌋ C[ c ] ex := K
+      UPair       : ∀{⛽ Δ Σ' F r1 r2 ex1 ex2 K1 K2 K'} →
+                      Δ , Σ' , F ⊢ r1 ⇐⌊ ⛽ ⌋ ex1 := K1 →
+                      Δ , Σ' , F ⊢ r2 ⇐⌊ ⛽ ⌋ ex2 := K2 →
+                      K1 ⊕ K2 := K' →
+                      Δ , Σ' , F ⊢ ⟨ r1 , r2 ⟩ ⇐⌊ ⛽ ⌋ ⟨ ex1 , ex2 ⟩ := K'
+      UFix        : ∀{⛽ ⛽↓ Δ Σ' F E f x e rf v r ex K} →
+                      ⛽ ⛽⇓ ⛽↓ →
+                      rf == [ E ]fix f ⦇·λ x => e ·⦈ →
+                      ⌈ r ⌉:= v →
+                      Δ , Σ' , F ⊢ e ⌊ ⛽ ⌋⇌ ((E ,, (f , rf) ,, (x , r)) , ex) :: [] := K →
+                      Δ , Σ' , F ⊢ rf ⇐⌊ ⛽ ⌋ v ↦ ex := K
+      UApp        : ∀{⛽ Δ Σ' F r1 r2 ex v2 K} →
+                      ex ≠ ¿¿ →
+                      ⌈ r2 ⌉:= v2 →
+                      Δ , Σ' , F ⊢ r1 ⇐⌊ ⛽ ⌋ v2 ↦ ex := K →
+                      Δ , Σ' , F ⊢ r1 ∘ r2 ⇐⌊ ⛽ ⌋ ex := K
+      UPrj1       : ∀{⛽ Δ Σ' F r ex K} →
+                      ex ≠ ¿¿ →
+                      Δ , Σ' , F ⊢ r ⇐⌊ ⛽ ⌋ ⟨ ex , ¿¿ ⟩ := K →
+                      Δ , Σ' , F ⊢ prj[ P1 ] r ⇐⌊ ⛽ ⌋ ex := K
+      UPrj2       : ∀{⛽ Δ Σ' F r ex K} →
+                      ex ≠ ¿¿ →
+                      Δ , Σ' , F ⊢ r ⇐⌊ ⛽ ⌋ ⟨ ¿¿ , ex ⟩ := K →
+                      Δ , Σ' , F ⊢ prj[ P2 ] r ⇐⌊ ⛽ ⌋ ex := K
+      UCase       : ∀{⛽ ⛽↓ Δ Σ' F E r rules ex c xc ec K1 K2 K'} →
+                      ex ≠ ¿¿ →
+                      ⛽ ⛽⇓ ⛽↓ →
+                      (c , |C xc => ec) ∈ rules →
+                      Δ , Σ' , F ⊢ r ⇐⌊ ⛽ ⌋ C[ c ] ¿¿ := K1 →
+                      Δ , Σ' , F ⊢ ec ⌊ ⛽↓ ⌋⇌ ((E ,, (xc , C⁻¹[ c ] r)) , ex) :: [] := K2 →
+                      K1 ⊕ K2 := K' →
+                      Δ , Σ' , F ⊢ [ E ]case r of⦃· rules ·⦄ ⇐⌊ ⛽ ⌋ ex := K'
+      UCaseGuess  : ∀{⛽ ⛽↓ Δ Σ' F F' E r rules ex c xc ec r' A K K' Kₘ₁ Kₘ₂} →
+                      ex ≠ ¿¿ →
+                      ⛽ ⛽⇓ ⛽↓ →
+                      (c , |C xc => ec) ∈ rules →
+                      Δ , Σ' ⊢ᴴ F' →
+                      F ## F' →
+                      F ∪ F' ⊢ r ⌊ ⛽ ⌋⇨ C[ c ] r' := A →
+                      Δ , Σ' ⊢Simplify A ⌊ ⛽ ⌋:= K →
+                      Δ , Σ' , F ∪ F' ⊢ ec ⌊ ⛽↓ ⌋⇌ ((E ,, (xc , r')) , ex) :: [] := K' →
+                      K ⊕ K' := Kₘ₁ →
+                      (F' , ∅) ⊕ Kₘ₁ := Kₘ₂ →
+                      Δ , Σ' , F ⊢ [ E ]case r of⦃· rules ·⦄ ⇐⌊ ⛽ ⌋ ex := Kₘ₂
+      UUnwrapCtor : ∀{⛽ Δ Σ' F c r ex K} →
+                      ex ≠ ¿¿ →
+                      Δ , Σ' , F ⊢ r ⇐⌊ ⛽ ⌋ C[ c ] ex := K →
+                      Δ , Σ' , F ⊢ C⁻¹[ c ] r ⇐⌊ ⛽ ⌋ ex := K
 
-    -- live bidirectional example satisfaction
-    data _,_⊢⦇_,_⊨_⦈⌊_⌋:=_ : hctx → denv → hole-fillings → exp → worlds → Fuel → constraints → Set where
-      SEmpty : ∀{⛽ Δ Σ' H e} → Δ , Σ' ⊢⦇ H , e ⊨ [] ⦈⌊ ⛽ ⌋:= (∅ , ∅)
-      SInd   : ∀{⛽ Δ Σ' H e W K E ex r r' K' Kₘ} →
-                 Δ , Σ' ⊢⦇ H , e ⊨ W ⦈⌊ ⛽ ⌋:= K →
-                 E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ [] →
-                 H ⊢ r ⌊ ⛽ ⌋⇨ r' →
-                 Δ , Σ' ⊢⦇ H , r' ⊨ ex ⦈⌊ ⛽ ⌋:=ᵁ K' →
-                 K' ⊕ K := Kₘ →
-                 Δ , Σ' ⊢⦇ H , e ⊨ ((E , ex) :: W) ⦈⌊ ⛽ ⌋:= Kₘ
+    -- Assertion Simplification
+    data _,_⊢Simplify_⌊_⌋:=_ : hctx → denv → assertions → Fuel → constraints → Set where
+      SNil : ∀{⛽ Δ Σ'} → Δ , Σ' ⊢Simplify [] ⌊ ⛽ ⌋:= (∅ , ∅)
+      SInd : ∀{⛽ Δ Σ' r v A K K' K''} →
+               Δ , Σ' ⊢Simplify A ⌊ ⛽ ⌋:= K →
+               r final →
+               Δ , Σ' , ∅ ⊢ r ⇐⌊ ⛽ ⌋ ⌊ v ⌋ := K' →
+               K ⊕ K' := K'' →
+               Δ , Σ' ⊢Simplify (r , v) :: A ⌊ ⛽ ⌋:= K''
+
+    -- Live Bidirectional Example Checking
+    data _,_,_⊢_⌊_⌋⇌_:=_ : hctx → denv → hole-fillings → exp → Fuel → excons → constraints → Set where
+      ChkNil : ∀{⛽ Δ Σ' F e} → Δ , Σ' , F ⊢ e ⌊ ⛽ ⌋⇌ [] := (∅ , ∅)
+      ChkInd : ∀{⛽ Δ Σ' F e E ex X r r' A A' K K' K'' Kₘ₁ Kₘ₂} →
+                 Δ , Σ' , F ⊢ e ⌊ ⛽ ⌋⇌ X := K →
+                 E ⊢ e ⌊ ⛽ ⌋⇒ r ⊣ A →
+                 F ⊢ r ⌊ ⛽ ⌋⇨ r' := A' →
+                 Δ , Σ' , F ⊢ r' ⇐⌊ ⛽ ⌋ ex := K' →
+                 Δ , Σ' ⊢Simplify A ++ A' ⌊ ⛽ ⌋:= K'' →
+                 K' ⊕ K'' := Kₘ₁ →
+                 K ⊕ Kₘ₁ := Kₘ₂ →
+                 Δ , Σ' , F ⊢ e ⌊ ⛽ ⌋⇌ ((E , ex) :: X) := Kₘ₂
 
   -- TODO theorems for all the things, including resumption, synthesis, solve, satisfaction, consistency, Group, and Filter
 
-  -- TODO proof that uneval(?) generalizes satisfaction stuff?
-
   -- Type-Directed Guessing
-  data _⊢⦇_⊢??:_⦈:=ᴳ_ : denv → tctx → typ → exp → Set where
-    GUnit  : ∀{Σ' Γ} → Σ' ⊢⦇ Γ ⊢??: ⟨⟩ ⦈:=ᴳ ⟨⟩
-    GPair  : ∀{Σ' Γ τ1 τ2 e1 e2} →
-               Σ' ⊢⦇ Γ ⊢??: τ1 ⦈:=ᴳ e1 →
-               Σ' ⊢⦇ Γ ⊢??: τ2 ⦈:=ᴳ e2 →
-               Σ' ⊢⦇ Γ ⊢??: ⟨ τ1 × τ2 ⟩ ⦈:=ᴳ ⟨ e1 , e2 ⟩
-    GCtor  : ∀{Σ' Γ d cctx c τ e} →
-               (d , cctx) ∈ π1 Σ' →
-               (c , τ) ∈ cctx →
-               Σ' ⊢⦇ Γ ⊢??: τ ⦈:=ᴳ e →
-               Σ' ⊢⦇ Γ ⊢??: D[ d ] ⦈:=ᴳ (C[ c ] e)
-    GFix   : ∀{Σ' Γ τ1 τ2 f x e} →
-               Σ' ⊢⦇ Γ ,, (f , τ1 ==> τ2) ,, (x , τ1) ⊢??: τ2 ⦈:=ᴳ e →
-               Σ' ⊢⦇ Γ ⊢??: τ1 ==> τ2 ⦈:=ᴳ fix f ⦇·λ x => e ·⦈
-    GMatch : ∀{Σ' Γ τ e rules d cctx} →
-               (d , cctx) ∈ π1 Σ' →
-               (∀{c} → dom cctx c → dom rules c) →
-               (∀{c} → dom rules c → dom cctx c) →
-               Σ' ⊢⦇ Γ ⊢??: D[ d ] ⦈:=ᴳ e →
-               (∀{c x-c e-c τ-c} →
-                  (c , |C x-c => e-c) ∈ rules →
-                  (c , τ-c) ∈ cctx →
-                  Σ' ⊢⦇ Γ ,, (x-c , τ-c) ⊢??: τ ⦈:=ᴳ e-c) →
-               Σ' ⊢⦇ Γ ⊢??: τ ⦈:=ᴳ case e of⦃· rules ·⦄
-    GVar   : ∀{Σ' Γ τ x} →
-               (x , τ) ∈ Γ →
-               Σ' ⊢⦇ Γ ⊢??: τ ⦈:=ᴳ X[ x ]
-    GApp   : ∀{Σ' Γ τ e1 e2 τ'} →
-               Σ' ⊢⦇ Γ ⊢??: τ' ==> τ ⦈:=ᴳ e1 →
-               Σ' ⊢⦇ Γ ⊢??: τ' ⦈:=ᴳ e2 →
-               Σ' ⊢⦇ Γ ⊢??: τ ⦈:=ᴳ (e1 ∘ e2)
-    GFst   : ∀{Σ' Γ τ1 τ2 e} →
-               Σ' ⊢⦇ Γ ⊢??: ⟨ τ1 × τ2 ⟩ ⦈:=ᴳ e →
-               Σ' ⊢⦇ Γ ⊢??: τ1 ⦈:=ᴳ fst e
-    GSnd   : ∀{Σ' Γ τ1 τ2 e} →
-               Σ' ⊢⦇ Γ ⊢??: ⟨ τ1 × τ2 ⟩ ⦈:=ᴳ e →
-               Σ' ⊢⦇ Γ ⊢??: τ2 ⦈:=ᴳ snd e
+  data _⊢⦇_⊢●:_⦈:=ᴳ_ : denv → tctx → typ → exp → Set where
+    GUnit : ∀{Σ' Γ} → Σ' ⊢⦇ Γ ⊢●: ⟨⟩ ⦈:=ᴳ ⟨⟩
+    GPair : ∀{Σ' Γ τ1 τ2 e1 e2} →
+              Σ' ⊢⦇ Γ ⊢●: τ1 ⦈:=ᴳ e1 →
+              Σ' ⊢⦇ Γ ⊢●: τ2 ⦈:=ᴳ e2 →
+              Σ' ⊢⦇ Γ ⊢●: ⟨ τ1 × τ2 ⟩ ⦈:=ᴳ ⟨ e1 , e2 ⟩
+    GCtor : ∀{Σ' Γ d cctx c τ e} →
+              (d , cctx) ∈ π1 Σ' →
+              (c , τ) ∈ cctx →
+              Σ' ⊢⦇ Γ ⊢●: τ ⦈:=ᴳ e →
+              Σ' ⊢⦇ Γ ⊢●: D[ d ] ⦈:=ᴳ (C[ c ] e)
+    GFix  : ∀{Σ' Γ τ1 τ2 f x e} →
+              Σ' ⊢⦇ Γ ,, (f , τ1 ==> τ2) ,, (x , τ1) ⊢●: τ2 ⦈:=ᴳ e →
+              Σ' ⊢⦇ Γ ⊢●: τ1 ==> τ2 ⦈:=ᴳ fix f ⦇·λ x => e ·⦈
+    GCase : ∀{Σ' Γ τ e rules d cctx} →
+              (d , cctx) ∈ π1 Σ' →
+              (∀{c} → dom cctx c → dom rules c) →
+              (∀{c} → dom rules c → dom cctx c) →
+              Σ' ⊢⦇ Γ ⊢●: D[ d ] ⦈:=ᴳ e →
+              (∀{c x-c e-c τ-c} →
+                 (c , |C x-c => e-c) ∈ rules →
+                 (c , τ-c) ∈ cctx →
+                 Σ' ⊢⦇ Γ ,, (x-c , τ-c) ⊢●: τ ⦈:=ᴳ e-c) →
+              Σ' ⊢⦇ Γ ⊢●: τ ⦈:=ᴳ case e of⦃· rules ·⦄
+    GVar  : ∀{Σ' Γ τ x} →
+              (x , τ) ∈ Γ →
+              Σ' ⊢⦇ Γ ⊢●: τ ⦈:=ᴳ X[ x ]
+    GApp  : ∀{Σ' Γ τ e1 e2 τ'} →
+              Σ' ⊢⦇ Γ ⊢●: τ' ==> τ ⦈:=ᴳ e1 →
+              Σ' ⊢⦇ Γ ⊢●: τ' ⦈:=ᴳ e2 →
+              Σ' ⊢⦇ Γ ⊢●: τ ⦈:=ᴳ (e1 ∘ e2)
+    GPrj  : ∀{Σ' Γ τ1 τ2 i e} →
+              Σ' ⊢⦇ Γ ⊢●: ⟨ τ1 × τ2 ⟩ ⦈:=ᴳ e →
+              Σ' ⊢⦇ Γ ⊢●: prj i τ1 τ2 ⦈:=ᴳ (prj[ i ] e)
 
   -- TODO theorem that if u # Δ , then u is new in a type-checked exp or result
-
-  -- TODO change :=> back to := after we come up with a new symbol for constraints
-  data Filter_:=>_ : worlds → worlds → Set where
-    FilterNil : Filter [] :=> []
-    FilterYes : ∀{W W' E ex} →
-                  Filter W :=> W' →
-                  ex ≠ ¿¿ →
-                  Filter (E , ex) :: W :=> ((E , ex) :: W')
-    FilterNo  : ∀{W W' E} →
-                  Filter W :=> W' →
-                  Filter (E , ¿¿) :: W :=> W'
 
   -- TODO theorem that any hole in the exp produced by refinement is in the goals
 
   -- Type-and-Example-Directed Refinement
-  data _⊢⦇_⊢??:_⊨_⦈⌊_⌋:=ᴿ_⊣_ : denv → tctx → typ → worlds → Fuel → exp → goals → Set where
-    IRUnit : ∀{⛽ Σ' Γ W Wf} →
-               (∀{i w} → Wf ⟦ i ⟧ == Some w → π2 w == ⟨⟩) →
-               Filter W :=> Wf →
-               Σ' ⊢⦇ Γ ⊢??: ⟨⟩ ⊨ W ⦈⌊ ⛽ ⌋:=ᴿ ⟨⟩ ⊣ []
-    IRPair : ∀{⛽ Σ' Γ τ1 τ2 W u1 u2 G1 G2} {E-ex1-ex2s : List (env ∧ ex ∧ ex)} →
-               Filter W :=> map (λ {(E , ex1 , ex2) → E , ⟨ ex1 , ex2 ⟩}) E-ex1-ex2s →
-               G1 == Γ ⊢??[ u1 ]: τ1 ⊨ map (λ {(E , ex1 , ex2) → E , ex1}) E-ex1-ex2s →
-               G2 == Γ ⊢??[ u2 ]: τ2 ⊨ map (λ {(E , ex1 , ex2) → E , ex2}) E-ex1-ex2s →
-               Σ' ⊢⦇ Γ ⊢??: ⟨ τ1 × τ2 ⟩ ⊨ W ⦈⌊ ⛽ ⌋:=ᴿ ⟨ ??[ u1 ] , ??[ u2 ] ⟩ ⊣ (G1 :: (G2 :: []))
-    IRCtor : ∀{⛽ Σ' Γ W W' d cctx c τ u G} →
-               (d , cctx) ∈ π1 Σ' →
-               (c , τ) ∈ cctx →
-               Filter W :=> map (λ {(E , ex) → E , C[ c ] ex}) W' →
-               G == Γ ⊢??[ u ]: τ ⊨ W' →
-               Σ' ⊢⦇ Γ ⊢??: D[ d ] ⊨ W ⦈⌊ ⛽ ⌋:=ᴿ C[ c ] ??[ u ] ⊣ (G :: [])
-    IRFun   : ∀{⛽ Σ' Γ W τ1 τ2 f x u W' G} {E-in-inᶜ-outs : List (env ∧ val ∧ result ∧ ex)} →
+  data _⊢⦇_⊢●:_⊨_⦈:=ᴿ_⊣_ : denv → tctx → typ → excons → exp → goals → Set where
+    RefUnit : ∀{Σ' Γ X Xf} →
+                Filter X := Xf →
+                (∀{i E ex} → Xf ⟦ i ⟧ == Some (E , ex) → ex == ⟨⟩) →
+                Σ' ⊢⦇ Γ ⊢●: ⟨⟩ ⊨ X ⦈:=ᴿ ⟨⟩ ⊣ []
+    RefPair : ∀{Σ' Γ τ1 τ2 X u1 u2 G1 G2} {E-ex1-ex2s : List (env ∧ ex ∧ ex)} →
+                Filter X := map (λ {(E , ex1 , ex2) → E , ⟨ ex1 , ex2 ⟩}) E-ex1-ex2s →
+                G1 == Γ ⊢??[ u1 ]: τ1 ⊨ map (λ {(E , ex1 , ex2) → E , ex1}) E-ex1-ex2s →
+                G2 == Γ ⊢??[ u2 ]: τ2 ⊨ map (λ {(E , ex1 , ex2) → E , ex2}) E-ex1-ex2s →
+                Σ' ⊢⦇ Γ ⊢●: ⟨ τ1 × τ2 ⟩ ⊨ X ⦈:=ᴿ ⟨ ??[ u1 ] , ??[ u2 ] ⟩ ⊣ (G1 :: (G2 :: []))
+    RefCtor : ∀{Σ' Γ X X' d cctx c τ u G} →
+                (d , cctx) ∈ π1 Σ' →
+                (c , τ) ∈ cctx →
+                Filter X := map (λ {(E , ex) → E , C[ c ] ex}) X' →
+                G == Γ ⊢??[ u ]: τ ⊨ X' →
+                Σ' ⊢⦇ Γ ⊢●: D[ d ] ⊨ X ⦈:=ᴿ C[ c ] ??[ u ] ⊣ (G :: [])
+    RefFix  : ∀{Σ' Γ X τ1 τ2 f x u X' G} {E-in-inᶜ-outs : List (env ∧ val ∧ result ∧ ex)} →
                 (∀{i E-i v-i r-i ex-i} →
                    E-in-inᶜ-outs ⟦ i ⟧ == Some (E-i , v-i , r-i , ex-i) →
-                   Coerce r-i := v-i) →
-                Filter W :=> map (λ {(E , in' , _ , out) → E , in' ↦ out}) E-in-inᶜ-outs →
-                W' == map (λ {(E , _ , in' , out) → (E ,, (f , [ E ]fix f ⦇·λ x => ??[ u ] ·⦈) ,, (x , in')) , out}) E-in-inᶜ-outs →
-                G == (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢??[ u ]: τ2 ⊨ W' →
-                Σ' ⊢⦇ Γ ⊢??: τ1 ==> τ2 ⊨ W ⦈⌊ ⛽ ⌋:=ᴿ fix f ⦇·λ x => ??[ u ] ·⦈ ⊣ (G :: [])
-    IRMatch : ∀{⛽ Σ' Γ W Wf τ e rules d cctx x c+τ+u+W⁺s Gs} →
-                Filter W :=> Wf →
-                -- choose a datatype
-                (d , cctx) ∈ π1 Σ' →
-                -- for each constructor c of the chosen datatype, there is some item in c+τ+u+W⁺s
-                -- that contains all the objects needed to construct the goal for that c
-                (∀{c τ-c} →
-                   (c , τ-c) ∈ cctx →
-                   Σ[ i ∈ Nat ] Σ[ u-c ∈ Nat ] Σ[ W⁺-c ∈ List (env ∧ ex ∧ result) ]
-                      (c+τ+u+W⁺s ⟦ i ⟧ == Some (c , τ-c , u-c , W⁺-c))) →
-                (∀{i c τ-c u-c W⁺-c} →
-                   c+τ+u+W⁺s ⟦ i ⟧ == Some (c , τ-c , u-c , W⁺-c) →
-                   (c , τ-c) ∈ cctx) →
-                -- choose one fresh variable name that will be used for all cases
-                x # Γ →
-                -- guess a scrutinee
-                Σ' ⊢⦇ Γ ⊢??: D[ d ] ⦈:=ᴳ e →
-                -- rules and Gs derive from the c+τ+u+W⁺s list
-                rules == list⇒ctx (map (λ {(c , τ-c , u-c , W⁺-c) → (c , |C x => ??[ u-c ])}) c+τ+u+W⁺s) →
-                Gs == map (λ {(c , τ-c , u-c , W⁺-c) → (Γ ,, (x , τ-c)) ⊢??[ u-c ]: τ ⊨ map (λ {(E , ex , r) → (E ,, (x , r)) , ex}) W⁺-c}) c+τ+u+W⁺s →
-                -- For each constructor c, ...
-                (∀{i c τ-c u-c W⁺-c} →
-                   c+τ+u+W⁺s ⟦ i ⟧ == Some (c , τ-c , u-c , W⁺-c) →
-                   -- for each world (extended with a result r-j) of W⁺-c, ...
-                   (∀{j E-j ex-j r-j} →
-                      W⁺-c ⟦ j ⟧ == Some (E-j , ex-j , r-j) →
-                        -- the world is an element of Filter W, and ...
-                        Σ[ k ∈ Nat ] (Wf ⟦ k ⟧ == Some (E-j , ex-j)) ∧
-                        -- the scrutinee e will evaluate to constructor c applied to the specified argument r-j
-                        E-j ⊢ e ⌊ ⛽ ⌋⇒ C[ c ] r-j ⊣ [])) →
-                -- Every world in Filter W is an element of some W⁺-c for some c
-                (∀{k E-k ex-k} →
-                   Wf ⟦ k ⟧ == Some (E-k , ex-k) →
-                   Σ[ i ∈ Nat ] Σ[ c ∈ Nat ] Σ[ τ-c ∈ typ ] Σ[ u-c ∈ Nat ] Σ[ W⁺-c ∈ List (env ∧ ex ∧ result)] Σ[ j ∈ Nat ] Σ[ r-j ∈ result ] (
-                      c+τ+u+W⁺s ⟦ i ⟧ == Some (c , τ-c , u-c , W⁺-c) ∧
-                      W⁺-c ⟦ j ⟧ == Some (E-k , ex-k , r-j))) →
-                Σ' ⊢⦇ Γ ⊢??: τ ⊨ W ⦈⌊ ⛽ ⌋:=ᴿ case e of⦃· rules ·⦄ ⊣ Gs
+                   ⌈ r-i ⌉:= v-i) →
+                Filter X := map (λ {(E , in' , _ , out) → E , in' ↦ out}) E-in-inᶜ-outs →
+                X' == map (λ {(E , _ , in' , out) → (E ,, (f , [ E ]fix f ⦇·λ x => ??[ u ] ·⦈) ,, (x , in')) , out}) E-in-inᶜ-outs →
+                G == (Γ ,, (f , τ1 ==> τ2) ,, (x , τ1)) ⊢??[ u ]: τ2 ⊨ X' →
+                Σ' ⊢⦇ Γ ⊢●: τ1 ==> τ2 ⊨ X ⦈:=ᴿ fix f ⦇·λ x => ??[ u ] ·⦈ ⊣ (G :: [])
+
+  -- Type-and-Example-Directed Branching
+  data _⊢⦇_⊢●:_⊨_⦈⌊_⌋:=ᴮ_⊣_ : denv → tctx → typ → excons → Fuel → exp → goals → Set where
+    BCase : ∀{⛽ Σ' Γ X Xf τ e rules d cctx x τ+u+X⁺-ctx Gs} →
+              Filter X := Xf →
+              -- choose one fresh variable name that will be used for all cases
+              x # Γ →
+              -- τ+u+X⁺-ctx is just cctx extended with hole names and excons
+              cctx == ctxmap π1 τ+u+X⁺-ctx →
+              -- the rules can be defined from x and the hole names in τ+u+X⁺-ctx
+              rules == ctxmap (λ {(τ-c , u-c , X⁺-c) → |C x => ??[ u-c ]}) τ+u+X⁺-ctx →
+              -- the following premises appear in the paper
+              (d , cctx) ∈ π1 Σ' →
+              Σ' ⊢⦇ Γ ⊢●: D[ d ] ⦈:=ᴳ e →
+              Gs == map
+                 (λ {(τ-c , u-c , X⁺-c) →
+                    -- this corresponds to the goal definition in the paper
+                    (Γ ,, (x , τ-c)) ⊢??[ u-c ]: τ ⊨
+                       -- this corresponds to the definition of each X_i in the paper
+                       map (λ {(E , ex , r) → (E ,, (x , r)) , ex}) X⁺-c})
+                 (ctx⇒values τ+u+X⁺-ctx) →
+              -- the following premise checks that every X⁺-c obeys the rules in the paper premise
+              (∀{c τ-c u-c X⁺-c} →
+                 (c , τ-c , u-c , X⁺-c) ∈ τ+u+X⁺-ctx →
+                 -- for each excon (extended with a result r-j) of X⁺-c, ...
+                 (∀{j E-j ex-j r-j} →
+                    X⁺-c ⟦ j ⟧ == Some (E-j , ex-j , r-j) →
+                      -- the excon is an element of Filter X, and ...
+                      Σ[ k ∈ Nat ] (Xf ⟦ k ⟧ == Some (E-j , ex-j)) ∧
+                      -- the scrutinee e will evaluate to constructor c applied to the specified argument r-j
+                      E-j ⊢ e ⌊ ⛽ ⌋⇒ C[ c ] r-j ⊣ [])) →
+              -- the last premise in the paper - every excon in Filter X is an element of some X⁺-c for some c
+              (∀{k E-k ex-k} →
+                 Xf ⟦ k ⟧ == Some (E-k , ex-k) →
+                 Σ[ c ∈ Nat ] Σ[ τ-c ∈ typ ] Σ[ u-c ∈ Nat ] Σ[ X⁺-c ∈ List (env ∧ ex ∧ result)] Σ[ j ∈ Nat ] Σ[ r-j ∈ result ] (
+                    (c , τ-c , u-c , X⁺-c) ∈ τ+u+X⁺-ctx ∧
+                    X⁺-c ⟦ j ⟧ == Some (E-k , ex-k , r-j))) →
+              Σ' ⊢⦇ Γ ⊢●: τ ⊨ X ⦈⌊ ⛽ ⌋:=ᴮ case e of⦃· rules ·⦄ ⊣ Gs
 
   -- Hole Filling
-  data _,_,_⊢⦇_⊢??[_]:_⊨_⦈⌊_⌋:=_,_ : hctx → denv → hole-fillings → tctx → Nat → typ → worlds → Fuel → constraints → hctx → Set where
-    HFRefine  : ∀{⛽ Δ Σ' H Γ u τ W e Gs K Δ'} →
-                  (∀{i j g-i g-j} →
-                     Gs ⟦ i ⟧ == Some g-i →
-                     Gs ⟦ j ⟧ == Some g-j →
-                       goal.g-id g-i # Δ ∧
-                       goal.g-id g-i ≠ u ∧
-                       (i ≠ j → goal.g-id g-i ≠ goal.g-id g-j)) →
-                  Σ' ⊢⦇ Γ ⊢??: τ ⊨ W ⦈⌊ ⛽ ⌋:=ᴿ e ⊣ Gs →
-                  K == (■ (u , e) , list⇒ctx (map (λ {(_ ⊢??[ u' ]: _ ⊨ W') → u' , W'}) Gs)) →
-                  Δ' == list⇒ctx (map (λ {(Γ' ⊢??[ u' ]: τ' ⊨ _) → u' , Γ' , τ'}) Gs) →
-                  Δ , Σ' , H ⊢⦇ Γ ⊢??[ u ]: τ ⊨ W ⦈⌊ ⛽ ⌋:= K , Δ'
-    HFGuess   : ∀{⛽ Δ Σ' H Γ u τ W e K K'} →
-                  Σ' ⊢⦇ Γ ⊢??: τ ⦈:=ᴳ e →
-                  Δ , Σ' ⊢⦇ (H ,, (u , e)) , e ⊨ W ⦈⌊ ⛽ ⌋:= K →
-                  (■ (u , e) , ∅) ⊕ K := K' →
-                  Δ , Σ' , H ⊢⦇ Γ ⊢??[ u ]: τ ⊨ W ⦈⌊ ⛽ ⌋:= K' , ∅
-    HFNothing : ∀{⛽ Δ Σ' H Γ u τ W} →
-                  W ≠ [] →
-                  Filter W :=> [] →
-                  Δ , Σ' , H ⊢⦇ Γ ⊢??[ u ]: τ ⊨ W ⦈⌊ ⛽ ⌋:= (■ (u , ??[ u ]) , ∅) , ∅
+  data _,_,_⊢⦇_⊢??[_]:_⊨_⦈⌊_⌋:=_,_ : hctx → denv → hole-fillings → tctx → Nat → typ → excons → Fuel → constraints → hctx → Set where
+    HFRefBranch : ∀{⛽ Δ Σ' F Γ u τ X e Gs K Δ'} →
+                    -- this premise ensures that all holes are fresh
+                    (∀{i j g-i g-j} →
+                       Gs ⟦ i ⟧ == Some g-i →
+                       Gs ⟦ j ⟧ == Some g-j →
+                         goal.g-id g-i # Δ ∧
+                         goal.g-id g-i ≠ u ∧
+                         (i ≠ j → goal.g-id g-i ≠ goal.g-id g-j)) →
+                    (Σ' ⊢⦇ Γ ⊢●: τ ⊨ X ⦈:=ᴿ e ⊣ Gs ∨
+                     Σ' ⊢⦇ Γ ⊢●: τ ⊨ X ⦈⌊ ⛽ ⌋:=ᴮ e ⊣ Gs) →
+                    K == (■ (u , e) , list⇒ctx (map (λ {(_ ⊢??[ u' ]: _ ⊨ X') → u' , X'}) Gs)) →
+                    Δ' == list⇒ctx (map (λ {(Γ' ⊢??[ u' ]: τ' ⊨ _) → u' , Γ' , τ'}) Gs) →
+                    Δ , Σ' , F ⊢⦇ Γ ⊢??[ u ]: τ ⊨ X ⦈⌊ ⛽ ⌋:= K , Δ'
+    HFGuessChk  : ∀{⛽ Δ Σ' F Γ u τ X e K K'} →
+                    Σ' ⊢⦇ Γ ⊢●: τ ⦈:=ᴳ e →
+                    Δ , Σ' , (F ,, (u , e)) ⊢ e ⌊ ⛽ ⌋⇌ X := K →
+                    (■ (u , e) , ∅) ⊕ K := K' →
+                    Δ , Σ' , F ⊢⦇ Γ ⊢??[ u ]: τ ⊨ X ⦈⌊ ⛽ ⌋:= K' , ∅
+    HFDefer     : ∀{⛽ Δ Σ' F Γ u τ X} →
+                    X ≠ [] →
+                    Filter X := [] →
+                    Δ , Σ' , F ⊢⦇ Γ ⊢??[ u ]: τ ⊨ X ⦈⌊ ⛽ ⌋:= (■ (u , ??[ u ]) , ∅) , ∅
 
-  data _,_IterSolve_,_⌊_⌋:=_,_ : hctx → denv → hole-fillings → worlds ctx → Fuel → hole-fillings → hctx → Set where
+  {- TODO - later, we need to fix this stuff up too
+  data _,_IterSolve_,_⌊_⌋:=_,_ : hctx → denv → hole-fillings → excons ctx → Fuel → hole-fillings → hctx → Set where
     ISFin : ∀{⛽ Δ Σ' F-0 U F' Δ' u+F+Δs} →
               (∀{u} → dom U u → dom Δ u) →
               ∥ u+F+Δs ∥ == 1+ ∥ U ∥ →
@@ -928,7 +994,7 @@ module core where
               Σ[ u-0 ∈ Nat ] (u+F+U+Δs ⟦ 0 ⟧ == Some (u-0 , F-0 , ∅ , Δ)) →
               (∀{u W} →
                  (u , W) ∈ U →
-                 Σ[ i ∈ Nat ] Σ[ F-i ∈ hole-fillings ] Σ[ U-i ∈ worlds ctx ] Σ[ Δ-i ∈ hctx ] (
+                 Σ[ i ∈ Nat ] Σ[ F-i ∈ hole-fillings ] Σ[ U-i ∈ excons ctx ] Σ[ Δ-i ∈ hctx ] (
                     1+ i < ∥ u+F+U+Δs ∥ ∧ u+F+U+Δs ⟦ i ⟧ == Some (u , F-i , U-i , Δ-i))) →
               (∀{i u-i u-i+1 W-i F-i F-i+1 U-i U-i+1 Δ-i Δ-i+1 Γ-i τ-i} →
                  1+ i < ∥ u+F+U+Δs ∥ →
@@ -942,7 +1008,7 @@ module core where
                     Δ-i+1 == Δ-i ∪ Δ'-i)) →
               U' == foldl _∪_ ∅ (map (π1 ⊙ (π2 ⊙ π2)) u+F+U+Δs) →
               U' ≠ ∅ →
-              Σ[ u-n ∈ Nat ] Σ[ U-n ∈ worlds ctx ] (u+F+U+Δs ⟦ ∥ U ∥ ⟧ == Some (u-n , F-n , U-n , Δ-n)) →
+              Σ[ u-n ∈ Nat ] Σ[ U-n ∈ excons ctx ] (u+F+U+Δs ⟦ ∥ U ∥ ⟧ == Some (u-n , F-n , U-n , Δ-n)) →
               Δ-n , Σ' IterSolve F-n , U' ⌊ ⛽ ⌋:= F' , Δ' →
               Δ , Σ' IterSolve F-0 , U ⌊ ⛽ ⌋:= F' , Δ'
 
@@ -950,6 +1016,7 @@ module core where
     Solve : ∀{⛽ Δ Σ' F0 U F Δ'} →
               Δ , Σ' IterSolve F0 , U ⌊ ⛽ ⌋:= F , Δ' →
               Δ , Σ' Solve (F0 , U) ⌊ ⛽ ⌋:= F
+  -}
 
 {- TODO
 
